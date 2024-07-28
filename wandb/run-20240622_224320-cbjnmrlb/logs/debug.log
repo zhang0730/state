@@ -1,0 +1,28 @@
+2024-06-22 22:43:20,212 INFO    MainThread:435316 [wandb_setup.py:_flush():76] Current SDK version is 0.17.2
+2024-06-22 22:43:20,212 INFO    MainThread:435316 [wandb_setup.py:_flush():76] Configure stats pid to 435316
+2024-06-22 22:43:20,212 INFO    MainThread:435316 [wandb_setup.py:_flush():76] Loading settings from /home/yhr/.config/wandb/settings
+2024-06-22 22:43:20,212 INFO    MainThread:435316 [wandb_setup.py:_flush():76] Loading settings from /home/yhr/UCE_train/wandb/settings
+2024-06-22 22:43:20,212 INFO    MainThread:435316 [wandb_setup.py:_flush():76] Loading settings from environment variables: {}
+2024-06-22 22:43:20,212 INFO    MainThread:435316 [wandb_setup.py:_flush():76] Applying setup settings: {'_disable_service': False}
+2024-06-22 22:43:20,212 INFO    MainThread:435316 [wandb_setup.py:_flush():76] Inferring run settings from compute environment: {'program_relpath': 'train_lit.py', 'program_abspath': '/home/yhr/UCE_train/train_lit.py', 'program': '/home/yhr/UCE_train/train_lit.py'}
+2024-06-22 22:43:20,212 INFO    MainThread:435316 [wandb_setup.py:_flush():76] Applying login settings: {}
+2024-06-22 22:43:20,212 INFO    MainThread:435316 [wandb_init.py:_log_setup():520] Logging user logs to ./wandb/run-20240622_224320-cbjnmrlb/logs/debug.log
+2024-06-22 22:43:20,212 INFO    MainThread:435316 [wandb_init.py:_log_setup():521] Logging internal logs to ./wandb/run-20240622_224320-cbjnmrlb/logs/debug-internal.log
+2024-06-22 22:43:20,212 INFO    MainThread:435316 [wandb_init.py:init():560] calling init triggers
+2024-06-22 22:43:20,213 INFO    MainThread:435316 [wandb_init.py:init():567] wandb.init called with sweep_config: {}
+config: {}
+2024-06-22 22:43:20,213 INFO    MainThread:435316 [wandb_init.py:init():610] starting backend
+2024-06-22 22:43:20,213 INFO    MainThread:435316 [wandb_init.py:init():614] setting up manager
+2024-06-22 22:43:20,215 INFO    MainThread:435316 [backend.py:_multiprocessing_setup():105] multiprocessing start_methods=fork,spawn,forkserver, using: spawn
+2024-06-22 22:43:20,219 INFO    MainThread:435316 [wandb_init.py:init():622] backend started and connected
+2024-06-22 22:43:20,223 INFO    MainThread:435316 [wandb_init.py:init():711] updated telemetry
+2024-06-22 22:43:20,848 INFO    MainThread:435316 [wandb_init.py:init():744] communicating run to backend with 90.0 second timeout
+2024-06-22 22:43:21,151 INFO    MainThread:435316 [wandb_run.py:_on_init():2402] communicating current version
+2024-06-22 22:43:21,207 INFO    MainThread:435316 [wandb_run.py:_on_init():2411] got version response 
+2024-06-22 22:43:21,208 INFO    MainThread:435316 [wandb_init.py:init():795] starting run threads in backend
+2024-06-22 22:43:36,758 INFO    MainThread:435316 [wandb_run.py:_console_start():2380] atexit reg
+2024-06-22 22:43:36,758 INFO    MainThread:435316 [wandb_run.py:_redirect():2235] redirect: wrap_raw
+2024-06-22 22:43:36,759 INFO    MainThread:435316 [wandb_run.py:_redirect():2300] Wrapping output streams.
+2024-06-22 22:43:36,759 INFO    MainThread:435316 [wandb_run.py:_redirect():2325] Redirects installed.
+2024-06-22 22:43:36,764 INFO    MainThread:435316 [wandb_init.py:init():838] run started, returning control to user process
+2024-06-22 22:43:42,735 WARNING MsgRouterThr:435316 [router.py:message_loop():77] message_loop has been closed

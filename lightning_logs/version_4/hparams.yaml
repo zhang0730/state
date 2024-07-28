@@ -1,0 +1,13 @@
+compiled: false
+d_hid: 1024
+d_model: 256
+dataset_embedding_dim: 16
+dropout: 0.0
+gradient_accumulation_steps: 1
+max_lr: 0.0004
+nhead: 8
+nlayers: 4
+num_datasets: 313
+output_dim: 256
+token_dim: 5120
+warmup_steps: 141552

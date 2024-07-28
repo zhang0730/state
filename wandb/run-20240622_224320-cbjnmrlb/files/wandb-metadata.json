@@ -1,0 +1,60 @@
+{
+    "os": "Linux-5.15.0-107-generic-x86_64-with-glibc2.35",
+    "python": "3.10.14",
+    "heartbeatAt": "2024-06-23T05:43:21.226495",
+    "startedAt": "2024-06-23T05:43:20.194191",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "/home/yhr/UCE_train/train_lit.py",
+    "codePathLocal": "train_lit.py",
+    "codePath": "train_lit.py",
+    "git": {
+        "remote": "git@github.com:snap-stanford/UCE_train.git",
+        "commit": "0cb18226848690fe56655eb6f4bfe08d7d89ab0f"
+    },
+    "email": null,
+    "root": "/home/yhr/UCE_train",
+    "host": "arc-slurm",
+    "username": "yhr",
+    "executable": "/home/yhr/.conda/envs/uce/bin/python",
+    "cpu_count": 4,
+    "cpu_count_logical": 4,
+    "cpu_freq": {
+        "current": 2199.996,
+        "min": 0.0,
+        "max": 0.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2199.996,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2199.996,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2199.996,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2199.996,
+            "min": 0.0,
+            "max": 0.0
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 117.55523681640625,
+            "used": 12.04281997680664
+        }
+    },
+    "memory": {
+        "total": 15.614669799804688
+    }
+}
