@@ -104,8 +104,8 @@ def main(args):
         every_n_epochs=1,
     )
 
-    #wandb_logger = WandbLogger(project="Lit_UCE")
-    #wandb_logger.watch(model, log_freq=5000)
+    wandb_logger = WandbLogger(project="arc-vci")
+    wandb_logger.watch(model, log_freq=1000)
     trainer = L.Trainer(max_epochs=args.n_epochs, 
                         
                         callbacks=[checkpoint_callback,  
@@ -118,7 +118,7 @@ def main(args):
                         precision="bf16-mixed",
                         strategy=DDPStrategy(process_group_backend="nccl"),
                         # Logging
-                        #logger=wandb_logger,
+                        logger=wandb_logger,
                         #profiler=PyTorchProfiler(),
                        )
     trainer.fit(model=model, train_dataloaders=dataloader)
