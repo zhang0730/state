@@ -16,6 +16,10 @@ experiment:
 embeddings:
   esm2:
     checkpoint: "/checkpoint/ctc/ML/uce/all_species_pe_tokens.torch"
+    # TODO: Eliminate the need for these attributes. This informtation can be
+    # read from the above file.
+    cnt: 145469
+    size: 5120
 
 dataset:
   name: "vci_h5ad"
@@ -34,8 +38,8 @@ tokenizer:
   token_dim: 5120
 
 model:
-  name: 'arc-vci'
-  batch_size: 256
+  name: 'vci'
+  batch_size: 128
   sample_size: 1024
   emsize: 256
   d_hid: 1024

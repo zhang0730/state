@@ -1,4 +1,5 @@
 import os
+import glob
 import torch
 import lightning as L
 
@@ -36,7 +37,6 @@ def main(cfg):
     TOTAL_N_CELL = cfg.dataset.num_cells
     EPOCH_LENGTH = int(TOTAL_N_CELL // cfg.model.batch_size // 24)
     warmup_steps = EPOCH_LENGTH * 6 # ? not sure why this needs to be included but seems empirical?? no clue why this is 6
-    SAVE_EVERY = (EPOCH_LENGTH // 2) + 4  # avoid saving an extra time
 
     # Setup Data
     dataset = MultiDatasetSentences(cfg)
@@ -50,31 +50,6 @@ def main(cfg):
                             num_workers=8,
                             persistent_workers=True)
 
-    # Setup Model
-    model = LitUCEModel(token_dim=cfg.tokenizer.token_dim,
-                        d_model=cfg.model.emsize,
-                        nhead=cfg.model.nhead,
-                        d_hid=cfg.model.d_hid,
-                        nlayers=cfg.model.nlayers,
-                        output_dim=cfg.model.output_dim,
-                        dropout=cfg.model.dropout,
-                        warmup_steps=warmup_steps,
-                        gradient_accumulation_steps=cfg.optimizer.gradient_accumulation_steps,
-                        compiled=False,
-                        num_datasets=len(dataset.datasets),
-                        max_lr=cfg.optimizer.max_lr).cuda()
-
-    # model = DistributedDataParallel(model, device_ids=[rank])
-
-    all_pe = get_ESM2_embeddings(cfg)
-    all_pe.requires_grad= False
-    model.pe_embedding = nn.Embedding.from_pretrained(all_pe)
-    model = model.train()
-
-    if cfg.experiment.compiled:
-        model = torch.compile(model, dynamic=False)
-
-    # Init ModelCheckpoint callback, monitoring 'val_loss'
     model_run_name = "exp_{0}_layers_{1}_dmodel_{2}_samples_{3}_max_lr_{4}_op_dim_{5}".format(
         cfg.experiment.name,
         cfg.model.nlayers,
@@ -82,6 +57,34 @@ def main(cfg):
         cfg.model.sample_size,
         cfg.optimizer.max_lr,
         cfg.model.output_dim)
+
+    chks = glob.glob(os.path.join(cfg.experiment.path, f'{model_run_name}*'))
+    if chks:
+        model = LitUCEModel.load_from_checkpoint(sorted(chks)[-1])
+        print(f'******** Loding chkpoint {model_run_name} {sorted(chks)[-1]}...')
+    else:
+        print(f'******** Initialized fresh {model_run_name}...')
+        model = LitUCEModel(token_dim=cfg.tokenizer.token_dim,
+                            d_model=cfg.model.emsize,
+                            nhead=cfg.model.nhead,
+                            d_hid=cfg.model.d_hid,
+                            nlayers=cfg.model.nlayers,
+                            output_dim=cfg.model.output_dim,
+                            dropout=cfg.model.dropout,
+                            warmup_steps=warmup_steps,
+                            gradient_accumulation_steps=cfg.optimizer.gradient_accumulation_steps,
+                            compiled=False,
+                            num_datasets=len(dataset.datasets),
+                            max_lr=cfg.optimizer.max_lr,
+                            emb_cnt=cfg.embeddings.esm2.cnt,
+                            emb_size=cfg.embeddings.esm2.size).cuda()
+        all_pe = get_ESM2_embeddings(cfg)
+        all_pe.requires_grad= False
+        model.pe_embedding = nn.Embedding.from_pretrained(all_pe)
+
+    model = model.train()
+    if cfg.experiment.compiled:
+        model = torch.compile(model, dynamic=False)
 
     checkpoint_callback = ModelCheckpoint(
         dirpath=cfg.experiment.path,

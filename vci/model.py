@@ -105,9 +105,8 @@ class LitUCEModel(L.LightningModule):
     def __init__(self, token_dim: int, d_model: int, nhead: int, d_hid: int,
                  nlayers: int, output_dim:int, dropout: float = 0.0,
                  warmup_steps: int = 0, gradient_accumulation_steps: int = 1,
-                 compiled: bool = False, num_datasets: int = 0, dataset_embedding_dim: int = 16, max_lr=4e-4
-
-                ):
+                 compiled: bool = False, num_datasets: int = 0, dataset_embedding_dim: int = 16, max_lr=4e-4,
+                  emb_cnt=145469, emb_size=5120):
         super().__init__()
         self.save_hyperparameters()
         self.compiled = compiled
@@ -159,8 +158,7 @@ class LitUCEModel(L.LightningModule):
         if compiled:
             self.gene_embedding_layer = torch.compile(self.gene_embedding_layer)
 
-        self.pe_embedding = None
-
+        self.pe_embedding = nn.Embedding(emb_cnt, emb_size)
 
     def forward(self, src: Tensor, mask: Tensor):
         """
