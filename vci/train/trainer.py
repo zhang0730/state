@@ -14,6 +14,7 @@ from lightning.pytorch.strategies import DDPStrategy
 from vci.model import LitUCEModel
 from vci.data import MultiDatasetSentences, MultiDatasetSentenceCollator
 from vci.train.callbacks import LogLR
+from vci.utils import get_latest_checkpoint
 
 
 def get_ESM2_embeddings(cfg):
@@ -50,20 +51,12 @@ def main(cfg):
                             num_workers=8,
                             persistent_workers=True)
 
-    model_run_name = "exp_{0}_layers_{1}_dmodel_{2}_samples_{3}_max_lr_{4}_op_dim_{5}".format(
-        cfg.experiment.name,
-        cfg.model.nlayers,
-        cfg.model.emsize,
-        cfg.model.sample_size,
-        cfg.optimizer.max_lr,
-        cfg.model.output_dim)
-
-    chks = glob.glob(os.path.join(cfg.experiment.path, f'{model_run_name}*'))
-    if chks:
-        model = LitUCEModel.load_from_checkpoint(sorted(chks)[-1])
-        print(f'******** Loding chkpoint {model_run_name} {sorted(chks)[-1]}...')
+    run_name, chk = get_latest_checkpoint(cfg)
+    if chk:
+        model = LitUCEModel.load_from_checkpoint(chk)
+        print(f'******** Loding chkpoint {run_name} {chk}...')
     else:
-        print(f'******** Initialized fresh {model_run_name}...')
+        print(f'******** Initialized fresh {run_name}...')
         model = LitUCEModel(token_dim=cfg.tokenizer.token_dim,
                             d_model=cfg.model.emsize,
                             nhead=cfg.model.nhead,
@@ -88,7 +81,7 @@ def main(cfg):
 
     checkpoint_callback = ModelCheckpoint(
         dirpath=cfg.experiment.path,
-        filename=f"{model_run_name}"+"-{epoch}-{step}",
+        filename=f"{run_name}"+"-{epoch}-{step}",
         # every_n_train_steps=cfg.experiment.checkpoint.every_n_train_steps,
         save_top_k=cfg.experiment.checkpoint.save_top_k,
         monitor='train_loss',
@@ -116,4 +109,4 @@ def main(cfg):
     trainer.fit(model=model, train_dataloaders=dataloader)
 
     trainer.save_checkpoint(os.path.join(cfg.experiment.path,
-                            f"{model_run_name}_final.pt"))
+                            f"{run_name}_final.pt"))
