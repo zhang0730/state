@@ -1,3 +1,4 @@
+import os
 import sys
 import h5py
 import hydra
@@ -7,8 +8,6 @@ import numpy as np
 from omegaconf import DictConfig
 
 import torch
-import lightning as L
-
 from torch import nn
 from torch.utils.data import DataLoader
 from torch.nn import BCEWithLogitsLoss
@@ -22,10 +21,24 @@ from vci.train.trainer import get_ESM2_embeddings
 log = logging.getLogger(__name__)
 
 
+checkpoint = '/checkpoint/ctc/ML/uce/model_checkpoints/exp_ds_medium_100_layers_4_dmodel_256_samples_1024_max_lr_0.0004_op_dim_256-epoch=6-step=82397.ckpt'
+emb_file = '/checkpoint/ctc/ML/uce/embeddings1.h5'
+
+def update_data(embeddings, losses, f):
+    embeddings = np.vstack(embeddings)
+    losses = np.vstack(losses)
+    log.info(f'Loss {losses.mean()}')
+    f['embedding'].resize((f['embedding'].shape[0] + embeddings.shape[0]), axis=0)
+    f['embedding'][-embeddings.shape[0]:] = embeddings
+
+    f['loss'].resize((f['loss'].shape[0] + losses.shape[0]), axis=0)
+    f['loss'][-losses.shape[0]:] = losses
+
+
 @hydra.main(config_path="../conf", config_name="eval")
 def main(cfg: DictConfig):
-    checkpoint = '/checkpoint/ctc/ML/uce/model_checkpoints/exp_ds_medium_100_layers_4_dmodel_256_samples_1024_max_lr_0.0004_op_dim_256-epoch=6-step=82397.ckpt'
-
+    log.info(f'Embeddings will be saved at {emb_file}')
+    log.info(f'Loading checkpoint from {checkpoint}')
     model = LitUCEModel.load_from_checkpoint(checkpoint)
     all_pe = get_ESM2_embeddings(cfg)
     all_pe.requires_grad= False
@@ -80,33 +93,31 @@ def main(cfg: DictConfig):
 
             loss = criterion(input=decs, target=Y)
             losses.append(loss.detach().cpu().numpy())
-
-            log.info(f'new_batch_{i} {embedding.shape} {loss.shape} {loss}')
             i = i + 1
 
             if i % 100 == 0:
-                embeddings = np.vstack(embeddings)
-                losses = np.vstack(losses)
-                log.info(f'Loss {losses.mean()}')
-                if not f:
-                    f = h5py.File('/checkpoint/ctc/ML/uce/embeddings.h5', 'a')
-                    f.create_dataset('embedding',
-                                     chunks=True,
-                                     data=embeddings,
-                                     maxshape=(None, 256))
-                    f.create_dataset('loss',
-                                     chunks=True,
-                                     data=losses,
-                                     maxshape=(None, 1))
+                if not os.path.exists(emb_file):
+                    embeddings = np.vstack(embeddings)
+                    losses = np.vstack(losses)
+                    with h5py.File(emb_file, "a") as h5f:
+                        h5f.create_dataset('embedding',
+                                        chunks=True,
+                                        data=embeddings,
+                                        maxshape=(None, 256))
+                        h5f.create_dataset('loss',
+                                        chunks=True,
+                                        data=losses,
+                                        maxshape=(None, 1))
                 else:
-                    f['embedding'].resize((f['embedding'].shape[0] + embeddings.shape[0]), axis=0)
-                    f['embedding'][-embeddings.shape[0]:] = embeddings
-
-                    f['loss'].resize((f['loss'].shape[0] + losses.shape[0]), axis=0)
-                    f['loss'][-losses.shape[0]:] = losses
+                    with h5py.File(emb_file, "a") as h5f:
+                        update_data(embeddings, losses, h5f)
 
                 embeddings = []
                 losses = []
+
+        if embeddings and losses:
+            with h5py.File(emb_file, "a") as h5f:
+                update_data(embeddings, losses, h5f)
 
 
 if __name__ == "__main__":

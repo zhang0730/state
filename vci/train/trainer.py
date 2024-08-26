@@ -40,16 +40,16 @@ def main(cfg):
     warmup_steps = EPOCH_LENGTH * 6 # ? not sure why this needs to be included but seems empirical?? no clue why this is 6
 
     # Setup Data
-    dataset = MultiDatasetSentences(cfg)
+    train_dataset = MultiDatasetSentences(cfg)
     multi_dataset_sentence_collator = MultiDatasetSentenceCollator(cfg)
 
     # Make the dataloader outside of the
-    dataloader = DataLoader(dataset,
-                            batch_size=cfg.model.batch_size,
-                            shuffle=True,
-                            collate_fn=multi_dataset_sentence_collator,
-                            num_workers=8,
-                            persistent_workers=True)
+    train_dataloader = DataLoader(train_dataset,
+                                  batch_size=cfg.model.batch_size,
+                                  shuffle=True,
+                                  collate_fn=multi_dataset_sentence_collator,
+                                  num_workers=8,
+                                  persistent_workers=True)
 
     run_name, chk = get_latest_checkpoint(cfg)
     if chk:
@@ -67,10 +67,11 @@ def main(cfg):
                             warmup_steps=warmup_steps,
                             gradient_accumulation_steps=cfg.optimizer.gradient_accumulation_steps,
                             compiled=False,
-                            num_datasets=len(dataset.datasets),
+                            num_datasets=len(train_dataset.datasets),
                             max_lr=cfg.optimizer.max_lr,
                             emb_cnt=cfg.embeddings.esm2.cnt,
-                            emb_size=cfg.embeddings.esm2.size).cuda()
+                            emb_size=cfg.embeddings.esm2.size,
+                            cfg=cfg).cuda()
         all_pe = get_ESM2_embeddings(cfg)
         all_pe.requires_grad= False
         model.pe_embedding = nn.Embedding.from_pretrained(all_pe)
@@ -106,7 +107,6 @@ def main(cfg):
                         #profiler=PyTorchProfiler(),
                         fast_dev_run=False,
                        )
-    trainer.fit(model=model, train_dataloaders=dataloader)
-
+    trainer.fit(model=model, train_dataloaders=train_dataloader)
     trainer.save_checkpoint(os.path.join(cfg.experiment.path,
                             f"{run_name}_final.pt"))

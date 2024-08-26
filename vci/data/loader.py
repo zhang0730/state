@@ -18,10 +18,14 @@ log = logging.getLogger(__file__)
 
 
 class MultiDatasetSentences(data.Dataset):
-    def __init__(self, cfg) -> None:
+    def __init__(self, cfg, test=False) -> None:
         super(MultiDatasetSentences, self).__init__()
 
-        _, self.datasets, self.shapes_dict = utils.get_shapes_dict(cfg.dataset.path)
+        ds_path = cfg.dataset.train
+        if test:
+            ds_path = cfg.dataset.test
+        _, self.datasets, self.shapes_dict = utils.get_shapes_dict(ds_path)
+
         self.cfg = cfg
 
         self.num_cells = {}

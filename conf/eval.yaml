@@ -23,7 +23,8 @@ embeddings:
 
 dataset:
   name: "vci_h5ad"
-  path: "/checkpoint/ctc/ML/uce/h5ad_train_dataset_sapiens.csv"
+  train: "/checkpoint/ctc/ML/uce/h5ad_train_dataset_sapiens.csv"
+  test: "/checkpoint/ctc/ML/uce/h5ad_test_dataset.csv"
   data_dir: "/large_experiments/ctc/ML/data/cell/unpublished/"
   protein_emb_file_format: "/checkpoint/ctc/ML/uce/gene_embidx_mapping_sapient.torch"
   pad_length: 2048
