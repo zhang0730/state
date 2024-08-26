@@ -8,7 +8,7 @@ experiment:
   num_gpus_per_node: 4
   master: localhost
   port: 12355
-  steps_between_test: 1000 # Number of steps between tests
+  val_check_interval: 10000 # Number of steps between tests
   checkpoint:
     save_top_k: 4
     every_n_epochs: 1

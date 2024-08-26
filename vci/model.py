@@ -226,9 +226,9 @@ class LitUCEModel(L.LightningModule):
         return loss
 
     @torch.compile(disable=True)
-    def test_step(self, batch, batch_idx):
-        loss, seq_len = self.shared_step(batch, batch_idx)
-        self.log("test_loss", loss)
+    def validation_step(self, batch, batch_idx):
+        loss, _ = self.shared_step(batch, batch_idx)
+        self.log("val_loss", loss)
         return loss
 
     def configure_optimizers(self):
@@ -250,18 +250,3 @@ class LitUCEModel(L.LightningModule):
             'frequency': 1,
         }
         return [optimizer], [lr_scheduler]
-
-    def on_train_batch_end(self, outputs, batch, batch_idx):
-        self.step_ctr += 1
-        if self.step_ctr % self.cfg.experiment.steps_between_test == 0 and self.trainer:
-            self.trainer.test(self)
-
-    def test_dataloader(self):
-        test_dataset = MultiDatasetSentences(self.cfg, test=True)
-        dataset_sentence_collator = MultiDatasetSentenceCollator(self.cfg)
-        return DataLoader(test_dataset,
-                          batch_size=self.cfg.model.batch_size,
-                          shuffle=True,
-                          collate_fn=dataset_sentence_collator,
-                          num_workers=8,
-                          persistent_workers=True)

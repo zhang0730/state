@@ -39,17 +39,25 @@ def main(cfg):
     EPOCH_LENGTH = int(TOTAL_N_CELL // cfg.model.batch_size // 24)
     warmup_steps = EPOCH_LENGTH * 6 # ? not sure why this needs to be included but seems empirical?? no clue why this is 6
 
-    # Setup Data
-    train_dataset = MultiDatasetSentences(cfg)
-    multi_dataset_sentence_collator = MultiDatasetSentenceCollator(cfg)
+    dataset_sentence_collator = MultiDatasetSentenceCollator(cfg)
 
-    # Make the dataloader outside of the
+    # Training dataloader
+    train_dataset = MultiDatasetSentences(cfg)
     train_dataloader = DataLoader(train_dataset,
                                   batch_size=cfg.model.batch_size,
-                                  shuffle=True,
-                                  collate_fn=multi_dataset_sentence_collator,
+                                  shuffle=False,
+                                  collate_fn=dataset_sentence_collator,
                                   num_workers=8,
                                   persistent_workers=True)
+
+    val_dataset = MultiDatasetSentences(cfg, test=True)
+    # dataset_sentence_collator = MultiDatasetSentenceCollator(self.cfg)
+    val_dataloader = DataLoader(val_dataset,
+                        batch_size=cfg.model.batch_size,
+                        shuffle=False,
+                        collate_fn=dataset_sentence_collator,
+                        num_workers=8,
+                        persistent_workers=True)
 
     run_name, chk = get_latest_checkpoint(cfg)
     if chk:
@@ -102,11 +110,15 @@ def main(cfg):
                         accumulate_grad_batches=cfg.optimizer.gradient_accumulation_steps,
                         precision="bf16-mixed",
                         strategy=DDPStrategy(process_group_backend="nccl"),
+                        val_check_interval=cfg.experiment.val_check_interval,
                         # Logging
                         logger=wandb_logger,
                         #profiler=PyTorchProfiler(),
                         fast_dev_run=False,
                        )
-    trainer.fit(model=model, train_dataloaders=train_dataloader)
+    trainer.fit(model=model,
+                train_dataloaders=train_dataloader,
+                val_dataloaders=val_dataloader)
+
     trainer.save_checkpoint(os.path.join(cfg.experiment.path,
                             f"{run_name}_final.pt"))
