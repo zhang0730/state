@@ -1,0 +1,10 @@
+name: SimpleSum
+checkpoint: null 
+device: cuda
+
+kwargs:
+  hidden_dim: 512
+  n_encoder_layers: 2  # Added number of layers parameter
+  n_decoder_layers: 2  # For final MLP when output_space="gene"
+  dropout: 0.0
+  activation: relu

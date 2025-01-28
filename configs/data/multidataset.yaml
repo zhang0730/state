@@ -1,0 +1,24 @@
+name: MultiDatasetPerturbationDataModule
+kwargs:
+  embed_key: X_uce
+  output_space: gene
+  train_task: replogle
+  test_task: replogle_jurkat:zeroshot
+  task_type: zeroshot
+  data_dir: /large_storage/ctc/userspace/aadduri/datasets/
+  pert_rep: onehot
+  basal_rep: sample
+  esm_perts_only: false
+  num_workers: 8
+  n_basal_samples: 1
+  sampling_random_state: 42
+  split_random_state: 42
+  basal_mapping_strategy: nearest
+  k_neighbors: 10
+  use_batch_ot: false 
+  should_yield_control_cells: true
+  split_train_val_controls: true
+  neighborhood_fraction: 0.1
+  preload_data: false
+output_dir: null
+debug: true

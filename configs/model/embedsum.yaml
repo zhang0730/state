@@ -1,0 +1,17 @@
+name: EmbedSum
+checkpoint: null
+device: cuda
+
+kwargs:
+    hidden_dim: 512
+    n_encoder_layers: 3
+    n_decoder_layers: 2
+    dropout: 0.0
+    embed_key: X_uce # this is not actually used right now but would be good to move from the data loader to model?
+    predict_residual: True
+
+    attribute_mapping:
+        predictions_key: uce_pred
+        embed_key: X_uce
+        embed_size: 1280
+        decoder: benchmark.val.decoder.uce_decoder
