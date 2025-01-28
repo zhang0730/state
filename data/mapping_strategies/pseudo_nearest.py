@@ -2,6 +2,7 @@ import numpy as np
 from sklearn.neighbors import NearestNeighbors
 from .mapping_strategies import BaseMappingStrategy
 
+
 class PseudoNearestMappingStrategy(BaseMappingStrategy):
     """
     A strategy that *does not* use the actual perturbed cell's embedding to
@@ -20,11 +21,11 @@ class PseudoNearestMappingStrategy(BaseMappingStrategy):
         name="pseudo_nearest",
         random_state=42,
         n_basal_samples=1,
-        global_basal=None,          # shape [embedding_dim]
-        pert_mean_offsets=None,     # dict: {pert_name -> np.ndarray([embedding_dim])}
+        global_basal=None,  # shape [embedding_dim]
+        pert_mean_offsets=None,  # dict: {pert_name -> np.ndarray([embedding_dim])}
         embed_key="X_uce",
         use_gene_space=False,
-        **kwargs
+        **kwargs,
     ):
         """
         Args:
@@ -43,25 +44,15 @@ class PseudoNearestMappingStrategy(BaseMappingStrategy):
         # We'll store for each split:
         #   - the control indices
         #   - a NearestNeighbors model for those control embeddings
-        self.split_control_indices = {
-            'train': None,
-            'train_eval': None,
-            'val': None,
-            'test': None
-        }
-        self.split_nn_model = {
-            'train': None,
-            'train_eval': None,
-            'val': None,
-            'test': None
-        }
+        self.split_control_indices = {"train": None, "train_eval": None, "val": None, "test": None}
+        self.split_nn_model = {"train": None, "train_eval": None, "val": None, "test": None}
 
     def register_split_indices(
         self,
         dataset: "PerturbationDataset",
         split: str,
         perturbed_indices: np.ndarray,
-        control_indices: np.ndarray
+        control_indices: np.ndarray,
     ):
         """Build a nearest-neighbor model for the control cells in this split."""
         if len(control_indices) == 0:
@@ -83,17 +74,9 @@ class PseudoNearestMappingStrategy(BaseMappingStrategy):
         # Build a NearestNeighbors model
         nn_model = NearestNeighbors(n_neighbors=self.n_basal_samples)
         nn_model.fit(control_embeddings)
-        self.split_nn_model[split] = {
-            "model": nn_model,
-            "embeddings": control_embeddings
-        }
+        self.split_nn_model[split] = {"model": nn_model, "embeddings": control_embeddings}
 
-    def get_control_indices(
-        self,
-        dataset: "PerturbationDataset",
-        split: str,
-        perturbed_idx: int
-    ) -> np.ndarray:
+    def get_control_indices(self, dataset: "PerturbationDataset", split: str, perturbed_idx: int) -> np.ndarray:
         """
         Synthesize the 'pseudo' embedding from global_basal + offset, find nearest
         neighbor in the split's control set, return that index (or multiple if n_basal_samples>1).

@@ -35,12 +35,12 @@ class SimpleSumPerturbationModel(PerturbationModel):
         n_decoder_layers: int = 1,
         dropout: float = 0.1,
         lr: float = 3e-4,
-        loss_fn = nn.MSELoss(),  # the base class will parse from config
+        loss_fn=nn.MSELoss(),  # the base class will parse from config
         embed_key: str = None,
         output_space: str = "gene",
-        decoder = None,
-        gene_names = None,
-        **kwargs
+        decoder=None,
+        gene_names=None,
+        **kwargs,
     ):
         """
         Args:
@@ -70,7 +70,7 @@ class SimpleSumPerturbationModel(PerturbationModel):
             output_space=output_space,
             decoder=decoder,
             gene_names=gene_names,
-            **kwargs
+            **kwargs,
         )
 
         # This will store {pert_name -> mean_offset_vector}, shape of mean_offset_vector == [input_dim].
@@ -94,7 +94,7 @@ class SimpleSumPerturbationModel(PerturbationModel):
                 out_dim=self.output_dim,
                 hidden_dim=self.hidden_dim,
                 n_layers=self.n_decoder_layers,
-                dropout=self.dropout
+                dropout=self.dropout,
             )
         else:
             self.project_out = None
@@ -116,8 +116,8 @@ class SimpleSumPerturbationModel(PerturbationModel):
         with torch.no_grad():
             for batch in train_loader:
                 # The base class's collate_fn returns dictionary with "X", "basal", "pert_name", ...
-                X = batch["X"]              # shape: (B, input_dim)
-                basal = batch["basal"]      # shape: (B, input_dim)
+                X = batch["X"]  # shape: (B, input_dim)
+                basal = batch["basal"]  # shape: (B, input_dim)
                 pert_names = batch["pert_name"]  # list of strings length B
 
                 X_cpu = X.float()
@@ -139,8 +139,7 @@ class SimpleSumPerturbationModel(PerturbationModel):
             # store it as a CPU float tensor, shape [input_dim]
             self.pert_mean_offsets[p_name_str] = mean_offset
 
-        logger.info("SimpleSum: offsets are computed for %d unique perturbations." %
-                    len(self.pert_mean_offsets))
+        logger.info("SimpleSum: offsets are computed for %d unique perturbations." % len(self.pert_mean_offsets))
 
     def encode_perturbation(self, pert: torch.Tensor) -> torch.Tensor:
         """Not really used here, but required by abstract base. We do no param-based encoding."""
@@ -189,25 +188,25 @@ class SimpleSumPerturbationModel(PerturbationModel):
             perturbed = self.project_out(perturbed)
 
         return perturbed
-    
+
     def configure_optimizers(self):
         """Return optimizer only if we have trainable parameters."""
         if self.project_out is not None:
             return torch.optim.Adam(self.parameters(), lr=self.lr)
         return None  # No parameters to optimize
-        
+
     def training_step(self, batch, batch_idx):
         """Override to handle parameter-free case."""
         pred = self(batch)
         target = batch["X_gene"] if self.output_space == "gene" else batch["X"]
         loss = self.loss_fn(pred, target)
-        
+
         # Only log the loss if we're actually training parameters
         if self.project_out is not None:
-            self.log('train_loss', loss, prog_bar=True)
+            self.log("train_loss", loss, prog_bar=True)
             return loss
         return None  # Skip optimizer step when no parameters
-    
+
     def on_save_checkpoint(self, checkpoint):
         """
         Save self.pert_mean_offsets into the checkpoint dictionary

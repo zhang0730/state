@@ -4,6 +4,7 @@ import torch.nn as nn
 from transformers import GPT2Model, GPT2Config, LlamaModel, LlamaConfig, PreTrainedModel
 from typing import Union
 
+
 def build_mlp(
     in_dim: int,
     out_dim: int,
@@ -19,13 +20,13 @@ def build_mlp(
     layers = []
     if n_layers < 1:
         raise ValueError("n_layers must be >= 1")
-    
+
     if n_layers == 1:
         layers.append(nn.Linear(in_dim, out_dim))
     else:
         # First layer
         layers.append(nn.Linear(in_dim, hidden_dim))
-        layers.append(activation())    # instantiate the class
+        layers.append(activation())  # instantiate the class
         layers.append(nn.Dropout(dropout))
 
         # Intermediate layers
@@ -39,6 +40,7 @@ def build_mlp(
 
     return nn.Sequential(*layers)
 
+
 def get_activation_class(name: str) -> nn.Module:
     """
     Given a string activation name, return the corresponding nn.Module class.
@@ -51,7 +53,7 @@ def get_activation_class(name: str) -> nn.Module:
     - GELU
     """
     name = name.lower()
-    
+
     if name == "relu":
         return nn.ReLU
     elif name == "leakyrelu":
@@ -66,6 +68,7 @@ def get_activation_class(name: str) -> nn.Module:
     else:
         raise ValueError(f"Unsupported activation function: {name}")
 
+
 def get_loss_fn(loss: Union[str, nn.Module]) -> nn.Module:
     """
     Given a string loss function name, return the corresponding nn.Module class.
@@ -79,12 +82,13 @@ def get_loss_fn(loss: Union[str, nn.Module]) -> nn.Module:
         return loss
 
     loss = loss.lower()
-    
+
     if loss == "mse":
         return nn.MSELoss()
     # Add more as needed...
     else:
         raise ValueError(f"Unsupported loss function: {loss}")
+
 
 def get_transformer_backbone(key, kwargs) -> PreTrainedModel:
     if key == "GPT2":

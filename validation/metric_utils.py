@@ -1,4 +1,5 @@
 """Utility functions for computing metrics."""
+
 import os
 import scipy
 import torch
@@ -84,14 +85,13 @@ def compute_mse(pred, true, ctrl, pred_ctrl):
 
 def compute_pearson(pred, true, ctrl, pred_ctrl):
     """Computes average pairwise Pearson correlation between batches x and y."""
-    return np.mean(
-        [np.corrcoef(pred[i], true[j])[0, 1] for i in range(len(pred)) for j in range(len(true)) if i == j]
-        )
+    return np.mean([np.corrcoef(pred[i], true[j])[0, 1] for i in range(len(pred)) for j in range(len(true)) if i == j])
+
 
 def compute_pearson_delta(pred, true, ctrl, pred_ctrl):
     """Computes Pearson correlation between pred and true after subtracting control."""
-    return pearsonr(pred.mean(0) - ctrl.mean(0),
-                    true.mean(0) - ctrl.mean(0))[0]
+    return pearsonr(pred.mean(0) - ctrl.mean(0), true.mean(0) - ctrl.mean(0))[0]
+
 
 def compute_pearson_delta_separate_controls(pred, true, ctrl, pred_ctrl):
     """
@@ -101,20 +101,21 @@ def compute_pearson_delta_separate_controls(pred, true, ctrl, pred_ctrl):
         pred_ctrl = f(ctrl, ctrl_pert)
     true are the real perturbed cells and ctrl are the real control cells
     """
-    return pearsonr(pred.mean(0) - pred_ctrl.mean(0),
-                    true.mean(0) - ctrl.mean(0))[0]
+    return pearsonr(pred.mean(0) - pred_ctrl.mean(0), true.mean(0) - ctrl.mean(0))[0]
+
 
 def compute_pearson_delta_batched(batched_means, weightings):
     """Computes Pearson correlation between pred and true after subtracting control."""
     ## TODO should we use the weightings here
 
-    pred_de = pd.DataFrame(batched_means['pert_pred'] - batched_means['ctrl_pred'])
+    pred_de = pd.DataFrame(batched_means["pert_pred"] - batched_means["ctrl_pred"])
     pred_de = pred_de.dropna().mean(0)
 
-    true_de = pd.DataFrame(batched_means['pert_true'] - batched_means['ctrl_true'])
+    true_de = pd.DataFrame(batched_means["pert_true"] - batched_means["ctrl_true"])
     true_de = true_de.dropna().mean(0)
 
     return pearsonr(pred_de, true_de)[0]
+
 
 def compute_cosine_similarity(pred, true, ctrl, pred_ctrl):
     """Computes cosine similarity between x and y."""
@@ -130,14 +131,17 @@ def compute_cosine_similarity(pred, true, ctrl, pred_ctrl):
     # return cos_sim_scores, max(cos_sim_scores)
     return np.mean(cos_sim_scores)
 
+
 def compute_cosine_similarity_v2(pred, true, ctrl, pred_ctrl):
     pred_mean = pred.mean(0)
     true_mean = true.mean(0)
     cosine_similarity = np.dot(pred_mean, true_mean) / (np.linalg.norm(pred_mean) * np.linalg.norm(true_mean))
     return cosine_similarity.item()
 
+
 def get_top_k_de(subset_adata, k):
-    return [x[0] for x in subset_adata.uns['rank_genes_groups']['names'][:k]]
+    return [x[0] for x in subset_adata.uns["rank_genes_groups"]["names"][:k]]
+
 
 def jaccard_score(x, y):
     set1 = set(x)
@@ -146,55 +150,54 @@ def jaccard_score(x, y):
     union = len(set1.union(set2))
     return intersection / union if union != 0 else 0
 
-def compute_gene_overlap_pert(pert_pred, pert_true, ctrl_true, ctrl_pred,
-                         gene_names=None, k=50):
-    #TODO this is too slow
+
+def compute_gene_overlap_pert(pert_pred, pert_true, ctrl_true, ctrl_pred, gene_names=None, k=50):
+    # TODO this is too slow
 
     pert_true = sc.AnnData(pert_true)
-    pert_true.obs['condition'] = 'pert'
+    pert_true.obs["condition"] = "pert"
     ctrl_true = sc.AnnData(ctrl_true)
-    ctrl_true.obs['condition'] = 'ctrl'
+    ctrl_true.obs["condition"] = "ctrl"
     adata_true = sc.concat([pert_true, ctrl_true])
     adata_true.obs = adata_true.obs.reset_index()
-    sc.tl.rank_genes_groups(adata_true, groupby='condition')
+    sc.tl.rank_genes_groups(adata_true, groupby="condition")
     true_de = get_top_k_de(adata_true, k)
 
     pert_pred = sc.AnnData(pert_pred)
-    pert_pred.obs['condition'] = 'pert'
+    pert_pred.obs["condition"] = "pert"
     ctrl_pred = sc.AnnData(ctrl_pred)
-    ctrl_pred.obs['condition'] = 'ctrl'
+    ctrl_pred.obs["condition"] = "ctrl"
     adata_pred = sc.concat([pert_pred, ctrl_pred])
     adata_pred.obs = adata_pred.obs.reset_index()
-    sc.tl.rank_genes_groups(adata_pred, groupby='condition')
+    sc.tl.rank_genes_groups(adata_pred, groupby="condition")
     pred_de = get_top_k_de(adata_pred, k)
 
-    overlap = len(set(true_de).intersection(set(pred_de)))/k
+    overlap = len(set(true_de).intersection(set(pred_de))) / k
 
     return overlap
 
-def compute_gene_overlap_cross_pert(DE_true, DE_pred,
-                                    control_pert='non-targeting', k=50):
 
+def compute_gene_overlap_cross_pert(DE_true, DE_pred, control_pert="non-targeting", k=50):
     all_overlaps = {}
     k = max(k, len(DE_true.columns))
     for c in DE_pred.index:
         if c == control_pert:
             continue
-        all_overlaps[c] = len(set(DE_true.loc[c].values).intersection(
-                              set(DE_pred.loc[c].values))) /k
+        all_overlaps[c] = len(set(DE_true.loc[c].values).intersection(set(DE_pred.loc[c].values))) / k
 
-    print('Average DE: ', np.mean(list(all_overlaps.values())))
+    print("Average DE: ", np.mean(list(all_overlaps.values())))
     return all_overlaps
 
+
 def compute_DE_for_truth_and_pred(
-    adata_real_ct,        # ground truth in gene space (or latent if output_space=latent but has real_exp?)
-    adata_pred_ct,        # predicted data (latent or gene)
+    adata_real_ct,  # ground truth in gene space (or latent if output_space=latent but has real_exp?)
+    adata_pred_ct,  # predicted data (latent or gene)
     control_pert: str,
     pert_col: str = "gene",
     n_top_genes: int = 2000,  # HVG cutoff
     k_de_genes: int = 50,
     output_space: str = "gene",
-    model_decoder: Optional[DecoderInterface] = None
+    model_decoder: Optional[DecoderInterface] = None,
 ):
     """
     Unify logic for computing DE from both the ground truth and model predictions.
@@ -249,8 +252,9 @@ def compute_DE_for_truth_and_pred(
         adata_pred_gene.obs.index = adata_pred_gene.obs.index.astype(str)
         adata_pred_hvg = adata_pred_gene[:, hvg_mask].copy()
         DE_pred = _compute_topk_DE(adata_pred_hvg, control_pert, pert_col, k_de_genes)
-    
+
     return DE_true, DE_pred
+
 
 def _compute_topk_DE(adata_gene, control_pert, pert_col, k):
     """
@@ -259,31 +263,31 @@ def _compute_topk_DE(adata_gene, control_pert, pert_col, k):
     """
 
     # rank Genes
-    sc.tl.rank_genes_groups(adata_gene,
-                            groupby=pert_col,
-                            reference=control_pert,
-                            rankby_abs=True,
-                            n_genes=k,
-                            method='wilcoxon',
-                            )
+    sc.tl.rank_genes_groups(
+        adata_gene,
+        groupby=pert_col,
+        reference=control_pert,
+        rankby_abs=True,
+        n_genes=k,
+        method="wilcoxon",
+    )
 
     # Extract results to DataFrame
-    de_genes = pd.DataFrame(adata_gene.uns['rank_genes_groups']['names'])
+    de_genes = pd.DataFrame(adata_gene.uns["rank_genes_groups"]["names"])
     # transpose so each row=pert, columns=the top K genes
     return de_genes.T
 
-def compute_DE(adata, pert_col='gene', control_pert='non-targeting', k=50):
+
+def compute_DE(adata, pert_col="gene", control_pert="non-targeting", k=50):
     """
     Compute DE in gene space.
     """
 
-    sc.tl.rank_genes_groups(adata, groupby=pert_col,
-                                   reference=control_pert,
-                                   rankby_abs=True,
-                                   n_genes=k)
-    de_genes = pd.DataFrame(adata.uns['rank_genes_groups']['names'])
+    sc.tl.rank_genes_groups(adata, groupby=pert_col, reference=control_pert, rankby_abs=True, n_genes=k)
+    de_genes = pd.DataFrame(adata.uns["rank_genes_groups"]["names"])
 
     return de_genes.T
+
 
 def compute_DE_pca(adata_pred, gene_names, pert_col, control_pert, k=50, transform=None):
     """
@@ -291,40 +295,30 @@ def compute_DE_pca(adata_pred, gene_names, pert_col, control_pert, k=50, transfo
     """
     if transform is None:
         raise ValueError("PCA transform required for compute_DE_pca")
-        
-    # Decode predictions back to gene space 
+
+    # Decode predictions back to gene space
     decoded_pred = transform.decode(adata_pred.X)
-    
+
     # Create new anndata with decoded predictions
-    decoded_adata = ad.AnnData(
-        X=decoded_pred.cpu().numpy(),
-        obs=adata_pred.obs,
-        var=pd.DataFrame(index=gene_names)
-    )
-    
+    decoded_adata = ad.AnnData(X=decoded_pred.cpu().numpy(), obs=adata_pred.obs, var=pd.DataFrame(index=gene_names))
+
     # Compute DE using scanpy
-    sc.tl.rank_genes_groups(
-        decoded_adata,
-        groupby=pert_col,
-        reference=control_pert,
-        rankby_abs=True,
-        n_genes=k
-    )
-    
+    sc.tl.rank_genes_groups(decoded_adata, groupby=pert_col, reference=control_pert, rankby_abs=True, n_genes=k)
+
     # Extract results
-    de_genes = pd.DataFrame(decoded_adata.uns['rank_genes_groups']['names'])
+    de_genes = pd.DataFrame(decoded_adata.uns["rank_genes_groups"]["names"])
     return de_genes.T
 
-def compute_mean_perturbation_effect(adata, pert_col='gene', ctrl_pert='non-targeting'):
+
+def compute_mean_perturbation_effect(adata, pert_col="gene", ctrl_pert="non-targeting"):
     adata_df = adata.to_df()
-    adata_df['pert'] = adata.obs[pert_col].values
-    mean_df = adata_df.groupby('pert').mean()
+    adata_df["pert"] = adata.obs[pert_col].values
+    mean_df = adata_df.groupby("pert").mean()
     mean_pert_effect = np.abs(mean_df - mean_df.loc[ctrl_pert])
     return mean_pert_effect
 
-def compute_perturbation_id_score(adata_pred, adata_real, pert_col='gene',
-                                  ctrl_pert='non-targeting'):
 
+def compute_perturbation_id_score(adata_pred, adata_real, pert_col="gene", ctrl_pert="non-targeting"):
     ## Given a specific perturbation, identify which model-predicted
     # perturbation is most similar to it
 
@@ -339,23 +333,18 @@ def compute_perturbation_id_score(adata_pred, adata_real, pert_col='gene',
     for pert in all_perts:
         real_effect = mean_real_effect.loc[pert].values
         pred_effects = mean_pred_effect.values
-        pred_pert = all_perts[np.argmax(cosine_similarity(real_effect.reshape(1,-1),
-                                                          pred_effects))]
+        pred_pert = all_perts[np.argmax(cosine_similarity(real_effect.reshape(1, -1), pred_effects))]
         pred_perts.append(pred_pert)
 
-
-    accuracy_score = np.sum(pred_perts == all_perts)/len(all_perts)
+    accuracy_score = np.sum(pred_perts == all_perts) / len(all_perts)
 
     return accuracy_score
 
 
-def compute_perturbation_ranking_score(adata_pred, adata_real, pert_col='gene',
-                                       ctrl_pert='non-targeting'):
+def compute_perturbation_ranking_score(adata_pred, adata_real, pert_col="gene", ctrl_pert="non-targeting"):
     ## Compute true mean perturbation effect
-    mean_real_effect = compute_mean_perturbation_effect(adata_real, pert_col,
-                                                        ctrl_pert)
-    mean_pred_effect = compute_mean_perturbation_effect(adata_pred, pert_col,
-                                                        ctrl_pert)
+    mean_real_effect = compute_mean_perturbation_effect(adata_real, pert_col, ctrl_pert)
+    mean_pred_effect = compute_mean_perturbation_effect(adata_pred, pert_col, ctrl_pert)
     all_perts = mean_real_effect.index.values
 
     ranks = []
@@ -376,14 +365,14 @@ def compute_perturbation_ranking_score(adata_pred, adata_real, pert_col='gene',
         ranks.append(rank_of_true_pert)
 
     ## mean normalized rank
-    mean_rank = np.mean(ranks)/len(all_perts)
+    mean_rank = np.mean(ranks) / len(all_perts)
 
     return mean_rank
 
 
-def compute_GI_score(pred_adata, true_adata, pert_col='gene', celltype_col='cell_type'):
-    """  Compute the Spearman correlation between the
-         predicted and true GI scores"""
+def compute_GI_score(pred_adata, true_adata, pert_col="gene", celltype_col="cell_type"):
+    """Compute the Spearman correlation between the
+    predicted and true GI scores"""
     pass
 
 
@@ -399,7 +388,7 @@ def get_GI_params(preds, combo):
     singles_expr = np.array([preds[combo[0]], preds[combo[1]]]).T
     first_expr = np.array(preds[combo[0]]).T
     second_expr = np.array(preds[combo[1]]).T
-    double_expr = np.array(preds[combo[0] + '_' + combo[1]]).T
+    double_expr = np.array(preds[combo[0] + "_" + combo[1]]).T
 
     return get_GI_coeffs(singles_expr, first_expr, second_expr, double_expr)
 
@@ -416,26 +405,21 @@ def get_GI_coeffs(singles_expr, first_expr, second_expr, double_expr):
 
     """
     results = {}
-    results['ts'] = TheilSenRegressor(fit_intercept=False,
-                                      max_subpopulation=1e5,
-                                      max_iter=1000,
-                                      random_state=1000)
+    results["ts"] = TheilSenRegressor(fit_intercept=False, max_subpopulation=1e5, max_iter=1000, random_state=1000)
     X = singles_expr
     y = double_expr
-    results['ts'].fit(X, y.ravel())
-    Zts = results['ts'].predict(X)
-    results['c1'] = results['ts'].coef_[0]
-    results['c2'] = results['ts'].coef_[1]
-    results['mag'] = np.sqrt((results['c1'] ** 2 + results['c2'] ** 2))
+    results["ts"].fit(X, y.ravel())
+    Zts = results["ts"].predict(X)
+    results["c1"] = results["ts"].coef_[0]
+    results["c2"] = results["ts"].coef_[1]
+    results["mag"] = np.sqrt((results["c1"] ** 2 + results["c2"] ** 2))
 
-    results['dcor'] = distance_correlation(singles_expr, double_expr)
-    results['dcor_singles'] = distance_correlation(first_expr, second_expr)
-    results['dcor_first'] = distance_correlation(first_expr, double_expr)
-    results['dcor_second'] = distance_correlation(second_expr, double_expr)
-    results['corr_fit'] = np.corrcoef(Zts.flatten(), double_expr.flatten())[
-        0, 1]
-    results['dominance'] = np.abs(np.log10(results['c1'] / results['c2']))
-    results['eq_contr'] = np.min(
-        [results['dcor_first'], results['dcor_second']]) / \
-                          np.max(
-                              [results['dcor_first'], results['dcor_second']])
+    results["dcor"] = distance_correlation(singles_expr, double_expr)
+    results["dcor_singles"] = distance_correlation(first_expr, second_expr)
+    results["dcor_first"] = distance_correlation(first_expr, double_expr)
+    results["dcor_second"] = distance_correlation(second_expr, double_expr)
+    results["corr_fit"] = np.corrcoef(Zts.flatten(), double_expr.flatten())[0, 1]
+    results["dominance"] = np.abs(np.log10(results["c1"] / results["c2"]))
+    results["eq_contr"] = np.min([results["dcor_first"], results["dcor_second"]]) / np.max(
+        [results["dcor_first"], results["dcor_second"]]
+    )

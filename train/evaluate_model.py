@@ -39,29 +39,37 @@ def parse_args():
     """
     parser = argparse.ArgumentParser(description="Evaluate a trained PerturbationModel.")
     parser.add_argument(
-        "--output_dir", 
-        type=str, 
+        "--output_dir",
+        type=str,
         required=True,
-        help="Path to the output_dir containing the config.yaml file that was saved during training."
+        help="Path to the output_dir containing the config.yaml file that was saved during training.",
     )
     parser.add_argument(
-        "--checkpoint", 
-        type=str, 
+        "--checkpoint",
+        type=str,
         default="last.ckpt",
-        help="Checkpoint filename. Default is 'last.ckpt'. Relative to the output directory."
+        help="Checkpoint filename. Default is 'last.ckpt'. Relative to the output directory.",
     )
     parser.add_argument(
-        "--map_type", 
-        type=str, 
+        "--map_type",
+        type=str,
         default=None,
-        choices=["centroid", "clustering", "batch", "random", "nearest", "pseudo_nearest", "pseudobulk"],
-        help="Override the mapping strategy at inference time (optional)."
+        choices=[
+            "centroid",
+            "clustering",
+            "batch",
+            "random",
+            "nearest",
+            "pseudo_nearest",
+            "pseudobulk",
+        ],
+        help="Override the mapping strategy at inference time (optional).",
     )
     parser.add_argument(
         "--test_time_finetune",
         type=int,
         default=0,
-        help="Number of epochs to fine-tune on control cells from test set before evaluation (default: 0, no fine-tuning)"
+        help="Number of epochs to fine-tune on control cells from test set before evaluation (default: 0, no fine-tuning)",
     )
     return parser.parse_args()
 
@@ -127,27 +135,30 @@ def main():
     checkpoint_path = os.path.join(checkpoint_dir, args.checkpoint)
     if not os.path.exists(checkpoint_path):
         raise FileNotFoundError(
-            f"Could not find checkpoint at {checkpoint_path}.\n"
-            "Specify a correct checkpoint filename with --checkpoint."
+            f"Could not find checkpoint at {checkpoint_path}.\nSpecify a correct checkpoint filename with --checkpoint."
         )
     logger.info("Loading model from %s", checkpoint_path)
 
     # The model architecture is determined by the config
     model_class_name = cfg["model"]["name"]  # e.g. "EmbedSum" or "NeuralOT"
-    model_kwargs = cfg["model"]["kwargs"]    # dictionary of hyperparams
+    model_kwargs = cfg["model"]["kwargs"]  # dictionary of hyperparams
 
     # Build the correct class
     if model_class_name.lower() == "embedsum":
         from models.embed_sum import EmbedSumPerturbationModel
+
         ModelClass = EmbedSumPerturbationModel
     elif model_class_name.lower() == "neuralot":
         from models.neural_ot import NeuralOTPerturbationModel
+
         ModelClass = NeuralOTPerturbationModel
     elif model_class_name.lower() == "simplesum":
         from models.simple_sum import SimpleSumPerturbationModel
-        ModelClass = SimpleSumPerturbationModel # it would be great if this was automatically kept in sync with the model.__init__
+
+        ModelClass = SimpleSumPerturbationModel  # it would be great if this was automatically kept in sync with the model.__init__
     elif model_class_name.lower() == "globalsimplesum":
         from models.global_simple_sum import GlobalSimpleSumPerturbationModel
+
         ModelClass = GlobalSimpleSumPerturbationModel
     else:
         raise ValueError(f"Unknown model class: {model_class_name}")
@@ -159,7 +170,7 @@ def main():
         "output_dim": var_dims["output_dim"],
         "pert_dim": var_dims["pert_dim"],
         # other model_kwargs keys to pass along:
-        **model_kwargs
+        **model_kwargs,
     }
 
     # load checkpoint
@@ -172,13 +183,16 @@ def main():
 
     # 5. Run inference on test set
     data_module.setup(stage="test")
-    test_loader = data_module.test_dataloader() # the test dataloader will always yield full expression data + optionally latent 
+    test_loader = (
+        data_module.test_dataloader()
+    )  # the test dataloader will always yield full expression data + optionally latent
     if test_loader is None:
         logger.warning("No test dataloader found. Exiting.")
         sys.exit(0)
 
     if args.test_time_finetune > 0:
         from train.test_time_finetuner import TestTimeFineTuner
+
         logger.info(f"Running test-time fine-tuning for {args.test_time_finetune} epochs...")
         finetuner = TestTimeFineTuner(
             model=model,
@@ -275,11 +289,7 @@ def main():
         final_X_gene = None
 
     # Build adatas for pred and real
-    obs = pd.DataFrame({
-        "pert_name": all_pert_names,
-        "celltype_name": all_celltypes,
-        "gem_group": all_gem_groups
-    })
+    obs = pd.DataFrame({"pert_name": all_pert_names, "celltype_name": all_celltypes, "gem_group": all_gem_groups})
 
     # Create adata for predictions
     adata_pred = anndata.AnnData(X=final_preds, obs=obs.copy())
@@ -287,9 +297,9 @@ def main():
     # Create adata for real
     adata_real = anndata.AnnData(X=final_reals, obs=obs.copy())
 
-    assert final_X_gene is not None # this should always be available for the test dataloader by construction
+    assert final_X_gene is not None  # this should always be available for the test dataloader by construction
     adata_real_exp = anndata.AnnData(X=final_X_gene, obs=obs.copy())
-    adata_real_exp.var.index = var_dims['gene_names']
+    adata_real_exp.var.index = var_dims["gene_names"]
 
     # TODO-Abhi: Remove this before merging, this is to account for a bug with training
     # that didn't store the decoder
@@ -308,7 +318,7 @@ def main():
         control_pert=data_module.get_control_pert(),
         pert_col="pert_name",
         celltype_col="celltype_name",
-        model_loc=None,   # can pass a path if needed
+        model_loc=None,  # can pass a path if needed
         DE_metric_flag=True,
         class_score_flag=True,
         embed_key=data_module.embed_key,
@@ -330,17 +340,24 @@ def main():
             metric_vals = df[metric_name].dropna().values
             if len(metric_vals) == 0:
                 continue
-            summary.append({
-                "celltype": celltype,
-                "metric_name": metric_name,
-                "metric_val": np.mean(metric_vals)
-            })
+            summary.append(
+                {
+                    "celltype": celltype,
+                    "metric_name": metric_name,
+                    "metric_val": np.mean(metric_vals),
+                }
+            )
 
     summary_df = pd.DataFrame(summary)
     logger.info("Summary of metrics:\n" + str(summary_df))
 
     # 8. Save metrics to CSV
-    eval_basedir = os.path.join(run_output_dir, "eval", f"map_{args.map_type or 'train_map'}", args.checkpoint.replace(".ckpt", ""))
+    eval_basedir = os.path.join(
+        run_output_dir,
+        "eval",
+        f"map_{args.map_type or 'train_map'}",
+        args.checkpoint.replace(".ckpt", ""),
+    )
     os.makedirs(eval_basedir, exist_ok=True)
     metrics_csv_path = os.path.join(eval_basedir, "metrics.csv")
     summary_df.to_csv(metrics_csv_path, index=False)

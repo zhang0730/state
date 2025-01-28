@@ -1,6 +1,5 @@
-# File: benchmark/models/neuralot/distributional_pert_model.py
+# File: models/neural_ot.py
 import torch
-import wandb
 
 from collections import defaultdict
 from geomloss import SamplesLoss
@@ -10,14 +9,14 @@ from models.base import PerturbationModel
 from models.decoders import DecoderInterface
 from models.utils import build_mlp, get_activation_class, get_transformer_backbone
 
+
 class NeuralOTPerturbationModel(PerturbationModel):
     """
-    Reimplements the neural OT model.
-
     This model:
-      1) Wraps a 'TranslationTransformerSamplesModel' (GPT2 backbone) or similar,
-      2) Uses an OT-based distributional loss (energy, sinkhorn, etc.) from geomloss,
-      3) Conforms to the PerturbationModel interface (encode/decode/perturb).
+      1) Projects basal expression and perturbation encodings into a shared latent space.
+      2) Uses an OT-based distributional loss (energy, sinkhorn, etc.) from geomloss.
+      3) Enables cells to attend to one another, learning a set-to-set function rather than
+      a sample-to-sample single-cell map.
     """
 
     def __init__(
@@ -32,7 +31,7 @@ class NeuralOTPerturbationModel(PerturbationModel):
         transformer_backbone_kwargs: dict = None,
         output_space: str = "gene",
         decoder: Optional[DecoderInterface] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         Args:
@@ -53,7 +52,7 @@ class NeuralOTPerturbationModel(PerturbationModel):
             pert_dim=pert_dim,
             output_space=output_space,
             decoder=decoder,
-            **kwargs
+            **kwargs,
         )
 
         # Save or store relevant hyperparams
@@ -103,7 +102,7 @@ class NeuralOTPerturbationModel(PerturbationModel):
             self.transformer_backbone_key,
             self.transformer_backbone_kwargs,
         )
-        
+
         self.project_out = build_mlp(
             in_dim=self.hidden_dim,
             out_dim=self.output_dim,
@@ -129,10 +128,10 @@ class NeuralOTPerturbationModel(PerturbationModel):
         """
         Return the latent perturbed state given the perturbation and basal state.
         """
-        pert_embedding = self.encode_perturbation(pert).unsqueeze(1) # shape: [batch_size, 1, hidden_dim]
-        control_cells = self.encode_basal_expression(basal).unsqueeze(1) # shape: [batch_size, 1, hidden_dim]
-        cls_input = torch.zeros_like(pert_embedding) # shape: [batch_size, 1, hidden_dim]
-        seq_input = torch.cat([pert_embedding, control_cells, cls_input], dim=1) # shape: [batch_size, 3, hidden_dim]
+        pert_embedding = self.encode_perturbation(pert).unsqueeze(1)  # shape: [batch_size, 1, hidden_dim]
+        control_cells = self.encode_basal_expression(basal).unsqueeze(1)  # shape: [batch_size, 1, hidden_dim]
+        cls_input = torch.zeros_like(pert_embedding)  # shape: [batch_size, 1, hidden_dim]
+        seq_input = torch.cat([pert_embedding, control_cells, cls_input], dim=1)  # shape: [batch_size, 3, hidden_dim]
 
         # forward pass + extract CLS last hidden state
         prediction = self.transformer_backbone(inputs_embeds=seq_input).last_hidden_state[:, -1]
@@ -146,23 +145,19 @@ class NeuralOTPerturbationModel(PerturbationModel):
 
     def forward(self, batch: dict) -> torch.Tensor:
         """
-        The main forward call. We'll replicate the old code:
+        The main forward call. The old code used (B, 2, N) tensors as
+        input to the GPT2-backbone. Here we reshape to (1, B, 2N) to
+        allow cells to attend to one another and learn a distributional
+        set function.
 
-        old code:
-          condition_vars = {k: v for k, v in batch.items() if k != "X"}
-          output_samples = self.model.forward(condition_vars)
-          return output_samples
         """
-        # prediction = self.perturb(batch["pert"], batch["basal"])
-        # output = self.project_out(prediction)
-       
-        # return output
-
-        pert_embedding = self.encode_perturbation(batch["pert"]).unsqueeze(1) # shape: [batch_size, 1, hidden_dim]
-        control_cells = self.encode_basal_expression(batch["basal"]).unsqueeze(1) # shape: [batch_size, 1, hidden_dim]
-        seq_input = torch.cat([pert_embedding, control_cells], dim=1) # shape: [batch_size, 2, hidden_dim]
-        seq_input = seq_input.permute(1, 0, 2).reshape(1, -1, 2 * self.hidden_dim) # shape: [1, batch_size, 2 * hidden_dim]
-        seq_input = self.convolve(seq_input) # shape: [1, batch_size, hidden_dim]
+        pert_embedding = self.encode_perturbation(batch["pert"]).unsqueeze(1)  # shape: [batch_size, 1, hidden_dim]
+        control_cells = self.encode_basal_expression(batch["basal"]).unsqueeze(1)  # shape: [batch_size, 1, hidden_dim]
+        seq_input = torch.cat([pert_embedding, control_cells], dim=1)  # shape: [batch_size, 2, hidden_dim]
+        seq_input = seq_input.permute(1, 0, 2).reshape(
+            1, -1, 2 * self.hidden_dim
+        )  # shape: [1, batch_size, 2 * hidden_dim]
+        seq_input = self.convolve(seq_input)  # shape: [1, batch_size, hidden_dim]
 
         # forward pass + extract CLS last hidden state
         prediction = self.transformer_backbone(inputs_embeds=seq_input).last_hidden_state[0]
@@ -185,14 +180,16 @@ class NeuralOTPerturbationModel(PerturbationModel):
         self.log("test_loss", loss, prog_bar=True)
         return loss
 
-
-
     def configure_optimizers(self):
         """
-        Return an optimizer for the internal model parameters. 
+        Return an optimizer for the internal model parameters.
         (Or you can do param re-grouping if needed.)
         """
         return torch.optim.Adam(self.parameters(), lr=self.lr)
+
+
+# Experiment with a learnable alignment loss function that lets 
+# the model pick the ground truth for a given cell:
 
 import torch
 import torch.nn as nn
@@ -202,55 +199,55 @@ class LearnableAlignmentLoss(nn.Module):
     def __init__(self, hidden_dim=1280, num_heads=4):
         """
         Initialize the learnable alignment loss function.
-        
+
         Args:
             hidden_dim (int): Dimension of the key/query projection space
             num_heads (int): Number of attention heads
         """
         super().__init__()
-        
+
         self.hidden_dim = hidden_dim
         self.num_heads = num_heads
-        
+
         # Learnable projection matrices for cross-attention
         self.Q = nn.Linear(hidden_dim, hidden_dim)
         self.K = nn.Linear(hidden_dim, hidden_dim)
-        
+
         # Initialize weights
         nn.init.xavier_uniform_(self.Q.weight)
         nn.init.xavier_uniform_(self.K.weight)
-        
+
     def forward(self, pred_samples, target_samples):
         """
         Compute the loss between predictions and targets using learnable alignment.
-        
+
         Args:
             pred_samples (torch.Tensor): Predictions of shape (B, N)
             target_samples (torch.Tensor): Targets of shape (B, N)
-            
+
         Returns:
             torch.Tensor: Scalar loss value
         """
         # Ensure inputs are the correct shape
         assert pred_samples.shape == target_samples.shape
-        
+
         B, N = pred_samples.shape  # batch size, feature dimension
-        
+
         # Project predictions and targets
         Q = self.Q(pred_samples)  # (B, hidden_dim)
         K = self.K(target_samples)  # (B, hidden_dim)
-        
+
         # Compute attention scores
         # (B, B) = (B, hidden_dim) @ (hidden_dim, B)
         attention_scores = torch.mm(Q, K.transpose(-2, -1))
-        
+
         # Apply row-wise softmax to get attention weights
         attention_weights = F.softmax(attention_scores, dim=-1)  # (B, B)
-        
+
         # Apply attention weights to targets
         aligned_targets = torch.mm(attention_weights, target_samples)  # (B, N)
-        
+
         # Compute MSE loss between aligned targets and predictions
         loss = F.mse_loss(aligned_targets, pred_samples)
-        
+
         return loss

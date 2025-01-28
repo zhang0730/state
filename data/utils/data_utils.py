@@ -51,7 +51,7 @@ def merge_adata(adata_list):
 def collapse_repeated_gene_names(adata):
     ## TODO this is slow, should be optimized
     df = adata.to_df()
-    df = df.T.groupby("gene_name").mean().T # assumption of a gene_name parameter
+    df = df.T.groupby("gene_name").mean().T  # assumption of a gene_name parameter
     return anndata.AnnData(
         X=df.values,
         obs=adata.obs,
@@ -62,7 +62,6 @@ def collapse_repeated_gene_names(adata):
 
 
 def use_embedding(adata, embed_key):
-
     if embed_key is not None:
         embed_adata = sc.AnnData(adata.obsm[embed_key])
         embed_adata.obs = adata.obs
@@ -190,9 +189,7 @@ def generate_onehot_map(keys):
     # maps iterable of keys to dictionary mapping unique keys -> onehot encoding
     unique_keys = sorted(list(set(keys)))
     onehot_map = {
-        k: torch.nn.functional.one_hot(torch.Tensor([i]).long(), len(unique_keys))
-        .float()
-        .squeeze(0)
+        k: torch.nn.functional.one_hot(torch.Tensor([i]).long(), len(unique_keys)).float().squeeze(0)
         for i, k in enumerate(unique_keys)
     }
     return onehot_map
@@ -216,10 +213,11 @@ def data_to_torch_X(X):
         X = X.toarray()
     return torch.from_numpy(X).float()
 
+
 def split_perturbations_by_cell_fraction(
     pert_groups: dict,  # {pert_name: np.ndarray of cell indices}
     val_fraction: float,
-    rng: np.random.Generator = None
+    rng: np.random.Generator = None,
 ):
     """
     Partition the set of perturbations into two subsets: 'val' vs 'train',
@@ -261,6 +259,7 @@ def split_perturbations_by_cell_fraction(
 
     return train_perts, val_perts
 
+
 class SincleCellDataset(data.Dataset):
     def __init__(
         self,
@@ -277,18 +276,14 @@ class SincleCellDataset(data.Dataset):
         self.expression = expression
 
         row_sums = self.expression.sum(1)  # UMI Counts
-        log_norm_count_adj = torch.log1p(
-            self.expression / (self.expression.sum(1)).unsqueeze(1) * torch.tensor(1000)
-        )
+        log_norm_count_adj = torch.log1p(self.expression / (self.expression.sum(1)).unsqueeze(1) * torch.tensor(1000))
 
         # Set log norm and count adjusted expression
         max_vals, max_idx = torch.max(log_norm_count_adj, dim=0)
         self.expression_mod = log_norm_count_adj / max_vals
 
         # Calculate dropout likliehoods of each gene
-        self.dropout_vec = (
-            (self.expression == 0).float().mean(0)
-        )  # per gene dropout percentages
+        self.dropout_vec = (self.expression == 0).float().mean(0)  # per gene dropout percentages
 
         # Set data info
         self.num_cells = self.expression.shape[0]
@@ -352,9 +347,7 @@ def anndata_to_sc_dataset(
     )
 
     if hv_genes is not None:
-        sc.pp.highly_variable_genes(
-            adata, flavor="seurat_v3", n_top_genes=hv_genes
-        )  # Expects Count Data
+        sc.pp.highly_variable_genes(adata, flavor="seurat_v3", n_top_genes=hv_genes)  # Expects Count Data
 
         hv_index = adata.var["highly_variable"]
         adata = adata[:, hv_index]  # Subset to hv genes only
@@ -366,9 +359,9 @@ def anndata_to_sc_dataset(
 
     covar_vals = None
     if len(labels) > 0:
-        assert (
-            covar_col is None or covar_col in labels
-        ), "Covar needs to be in labels"  # make sure you keep track of covar column!
+        assert covar_col is None or covar_col in labels, (
+            "Covar needs to be in labels"
+        )  # make sure you keep track of covar column!
         labels = adata.obs.loc[:, labels].values
 
         if covar_col is not None:
@@ -385,26 +378,18 @@ def anndata_to_sc_dataset(
     )
 
 
-def adata_path_to_prot_chrom_starts(
-    adata, dataset_species, spec_pe_genes, gene_to_chrom_pos, offset
-):
+def adata_path_to_prot_chrom_starts(adata, dataset_species, spec_pe_genes, gene_to_chrom_pos, offset):
     """
     Given a :path: to an h5ad,
     """
-    pe_row_idxs = torch.tensor(
-        [spec_pe_genes.index(k.upper()) + offset for k in adata.var_names]
-    ).long()
+    pe_row_idxs = torch.tensor([spec_pe_genes.index(k.upper()) + offset for k in adata.var_names]).long()
     log.info(len(np.unique(pe_row_idxs)))
 
-    spec_chrom = gene_to_chrom_pos[
-        gene_to_chrom_pos["species"] == dataset_species
-    ].set_index("gene_symbol")
+    spec_chrom = gene_to_chrom_pos[gene_to_chrom_pos["species"] == dataset_species].set_index("gene_symbol")
 
     gene_chrom = spec_chrom.loc[[k.upper() for k in adata.var_names]]
 
-    dataset_chroms = gene_chrom[
-        "spec_chrom"
-    ].cat.codes  # now this is correctely indexed by species and chromosome
+    dataset_chroms = gene_chrom["spec_chrom"].cat.codes  # now this is correctely indexed by species and chromosome
     log.info("Max Code:", max(dataset_chroms))
     dataset_pos = gene_chrom["start"].values
     return pe_row_idxs, dataset_chroms, dataset_pos
@@ -437,9 +422,7 @@ def process_raw_anndata(row, additional_filter, root):
         sc.pp.filter_genes(ad, min_cells=10)
         sc.pp.filter_cells(ad, min_genes=25)
 
-    dataset, adata = anndata_to_sc_dataset(
-        ad, species=species, labels=labels, covar_col=covar_col, hv_genes=None
-    )
+    dataset, adata = anndata_to_sc_dataset(ad, species=species, labels=labels, covar_col=covar_col, hv_genes=None)
     adata = adata.copy()
 
     if additional_filter:
@@ -481,34 +464,22 @@ def get_species_to_pe(EMBEDDING_DIR):
     embeddings_paths = {
         "human": EMBEDDING_DIR / "Homo_sapiens.GRCh38.gene_symbol_to_embedding_ESM2.pt",
         "mouse": EMBEDDING_DIR / "Mus_musculus.GRCm39.gene_symbol_to_embedding_ESM2.pt",
-        "frog": EMBEDDING_DIR
-        / "Xenopus_tropicalis.Xenopus_tropicalis_v9.1.gene_symbol_to_embedding_ESM2.pt",
-        "zebrafish": EMBEDDING_DIR
-        / "Danio_rerio.GRCz11.gene_symbol_to_embedding_ESM2.pt",
-        "mouse_lemur": EMBEDDING_DIR
-        / "Microcebus_murinus.Mmur_3.0.gene_symbol_to_embedding_ESM2.pt",
-        "pig": EMBEDDING_DIR
-        / "Sus_scrofa.Sscrofa11.1.gene_symbol_to_embedding_ESM2.pt",
+        "frog": EMBEDDING_DIR / "Xenopus_tropicalis.Xenopus_tropicalis_v9.1.gene_symbol_to_embedding_ESM2.pt",
+        "zebrafish": EMBEDDING_DIR / "Danio_rerio.GRCz11.gene_symbol_to_embedding_ESM2.pt",
+        "mouse_lemur": EMBEDDING_DIR / "Microcebus_murinus.Mmur_3.0.gene_symbol_to_embedding_ESM2.pt",
+        "pig": EMBEDDING_DIR / "Sus_scrofa.Sscrofa11.1.gene_symbol_to_embedding_ESM2.pt",
         "macaca_fascicularis": EMBEDDING_DIR
         / "Macaca_fascicularis.Macaca_fascicularis_6.0.gene_symbol_to_embedding_ESM2.pt",
-        "macaca_mulatta": EMBEDDING_DIR
-        / "Macaca_mulatta.Mmul_10.gene_symbol_to_embedding_ESM2.pt",
+        "macaca_mulatta": EMBEDDING_DIR / "Macaca_mulatta.Mmul_10.gene_symbol_to_embedding_ESM2.pt",
     }
     extra_species = (
-        pd.read_csv("./model_files/new_species_protein_embeddings.csv")
-        .set_index("species")
-        .to_dict()["path"]
+        pd.read_csv("./model_files/new_species_protein_embeddings.csv").set_index("species").to_dict()["path"]
     )
     embeddings_paths.update(extra_species)  # adds new species
 
-    species_to_pe = {
-        species: torch.load(pe_dir) for species, pe_dir in embeddings_paths.items()
-    }
+    species_to_pe = {species: torch.load(pe_dir) for species, pe_dir in embeddings_paths.items()}
 
-    species_to_pe = {
-        species: {k.upper(): v for k, v in pe.items()}
-        for species, pe in species_to_pe.items()
-    }
+    species_to_pe = {species: {k.upper(): v for k, v in pe.items()} for species, pe in species_to_pe.items()}
     return species_to_pe
 
 
@@ -530,18 +501,13 @@ MODEL_TO_SPECIES_TO_GENE_EMBEDDING_PATH = {
     "ESM2": {
         "human": EMBEDDING_DIR / "Homo_sapiens.GRCh38.gene_symbol_to_embedding_ESM2.pt",
         "mouse": EMBEDDING_DIR / "Mus_musculus.GRCm39.gene_symbol_to_embedding_ESM2.pt",
-        "frog": EMBEDDING_DIR
-        / "Xenopus_tropicalis.Xenopus_tropicalis_v9.1.gene_symbol_to_embedding_ESM2.pt",
-        "zebrafish": EMBEDDING_DIR
-        / "Danio_rerio.GRCz11.gene_symbol_to_embedding_ESM2.pt",
-        "mouse_lemur": EMBEDDING_DIR
-        / "Microcebus_murinus.Mmur_3.0.gene_symbol_to_embedding_ESM2.pt",
-        "pig": EMBEDDING_DIR
-        / "Sus_scrofa.Sscrofa11.1.gene_symbol_to_embedding_ESM2.pt",
+        "frog": EMBEDDING_DIR / "Xenopus_tropicalis.Xenopus_tropicalis_v9.1.gene_symbol_to_embedding_ESM2.pt",
+        "zebrafish": EMBEDDING_DIR / "Danio_rerio.GRCz11.gene_symbol_to_embedding_ESM2.pt",
+        "mouse_lemur": EMBEDDING_DIR / "Microcebus_murinus.Mmur_3.0.gene_symbol_to_embedding_ESM2.pt",
+        "pig": EMBEDDING_DIR / "Sus_scrofa.Sscrofa11.1.gene_symbol_to_embedding_ESM2.pt",
         "macaca_fascicularis": EMBEDDING_DIR
         / "Macaca_fascicularis.Macaca_fascicularis_6.0.gene_symbol_to_embedding_ESM2.pt",
-        "macaca_mulatta": EMBEDDING_DIR
-        / "Macaca_mulatta.Mmul_10.gene_symbol_to_embedding_ESM2.pt",
+        "macaca_mulatta": EMBEDDING_DIR / "Macaca_mulatta.Mmul_10.gene_symbol_to_embedding_ESM2.pt",
     }
 }
 
@@ -569,38 +535,27 @@ def load_gene_embeddings_adata(
     species_names_set = set(species_names)
 
     # Get embedding paths for the model
-    species_to_gene_embedding_path = MODEL_TO_SPECIES_TO_GENE_EMBEDDING_PATH[
-        embedding_model
-    ]
+    species_to_gene_embedding_path = MODEL_TO_SPECIES_TO_GENE_EMBEDDING_PATH[embedding_model]
     available_species = set(species_to_gene_embedding_path)
 
     # Ensure embeddings are available for all species
     if not (species_names_set <= available_species):
-        raise ValueError(
-            f"The following species do not have gene embeddings: {species_names_set - available_species}"
-        )
+        raise ValueError(f"The following species do not have gene embeddings: {species_names_set - available_species}")
 
     # Load gene embeddings for desired species (and convert gene symbols to lower case)
     species_to_gene_symbol_to_embedding = {
         species: {
             gene_symbol.lower(): gene_embedding
-            for gene_symbol, gene_embedding in torch.load(
-                species_to_gene_embedding_path[species]
-            ).items()
+            for gene_symbol, gene_embedding in torch.load(species_to_gene_embedding_path[species]).items()
         }
         for species in species_names
     }
 
     # Determine which genes to include based on gene expression and embedding availability
     genes_with_embeddings = set.intersection(
-        *[
-            set(gene_symbol_to_embedding)
-            for gene_symbol_to_embedding in species_to_gene_symbol_to_embedding.values()
-        ]
+        *[set(gene_symbol_to_embedding) for gene_symbol_to_embedding in species_to_gene_symbol_to_embedding.values()]
     )
-    genes_to_use = {
-        gene for gene in adata.var_names if gene.lower() in genes_with_embeddings
-    }
+    genes_to_use = {gene for gene in adata.var_names if gene.lower() in genes_with_embeddings}
 
     # Subset data to only use genes with embeddings
     adata = adata[:, adata.var_names.isin(genes_to_use)]
@@ -608,10 +563,7 @@ def load_gene_embeddings_adata(
     # Set up dictionary mapping species to gene embedding matrix (num_genes, embedding_dim)
     species_to_gene_embeddings = {
         species_name: torch.stack(
-            [
-                species_to_gene_symbol_to_embedding[species_name][gene_symbol.lower()]
-                for gene_symbol in adata.var_names
-            ]
+            [species_to_gene_symbol_to_embedding[species_name][gene_symbol.lower()] for gene_symbol in adata.var_names]
         )
         for species_name in species_names
     }
@@ -646,9 +598,7 @@ def equal_subsampling(adata, obs_key, N_min=None):
 
     counts = adata.obs[obs_key].value_counts()
     if N_min is not None:
-        groups = counts.index[
-            counts >= N_min
-        ]  # ignore groups with less than N_min cells to begin with
+        groups = counts.index[counts >= N_min]  # ignore groups with less than N_min cells to begin with
     else:
         groups = counts.index
     # We select downsampling target counts by min-max, i.e.
@@ -657,17 +607,13 @@ def equal_subsampling(adata, obs_key, N_min=None):
     N = N if N_min == None else np.max([N_min, N])
     # subsample indices per group
     indices = [
-        np.random.choice(
-            adata.obs_names[adata.obs[obs_key] == group], size=N, replace=False
-        )
-        for group in groups
+        np.random.choice(adata.obs_names[adata.obs[obs_key] == group], size=N, replace=False) for group in groups
     ]
     selection = np.hstack(np.array(indices))
     return adata[selection].copy()
 
 
 def drop_low_cellcount_perts(adata, obs_key, N_min=0):
-
     if N_min == 0:
         return adata
 

@@ -6,18 +6,19 @@ from models.decoders import DecoderInterface
 from models.utils import build_mlp
 from models.utils import get_activation_class
 
+
 class EmbedSumPerturbationModel(PerturbationModel):
     """
     Implementation of the EmbedSum model which treats perturbations as learned embeddings
     that are added to control cell representations, which are input as gene expression counts
     or as embeddings from a foundation model (UCE, scGPT, etc). The outputs are always in
     gene expression space.
-    
+
     This model:
     1. Learns a co-embedding space for perturbations and cell states
     2. Computes perturbation effects in this space
     3. Decoder maps perturbed embeddings to gene expression space
-    
+
     Args:
         input_dim: Dimension of input embeddings (either number of genes or latent dim from obsm key)
         hidden_dim: Dimension of hidden layers
@@ -30,6 +31,7 @@ class EmbedSumPerturbationModel(PerturbationModel):
         learning_rate: Learning rate for optimizer (default: 1e-3)
         loss_fn: Loss function (default: 'nn.MSELoss()')
     """
+
     def __init__(
         self,
         input_dim: int,
@@ -38,7 +40,7 @@ class EmbedSumPerturbationModel(PerturbationModel):
         pert_dim: int,
         output_space: str = "gene",
         decoder: Optional[DecoderInterface] = None,
-        **kwargs
+        **kwargs,
     ):
         # Register with parent constructor
         super().__init__(
@@ -48,13 +50,13 @@ class EmbedSumPerturbationModel(PerturbationModel):
             pert_dim=pert_dim,
             output_space=output_space,
             decoder=decoder,
-            **kwargs
+            **kwargs,
         )
 
         # Set class specific parameters before registering with parent constructor
-        self.n_encoder_layers = kwargs.get('n_encoder_layers', 2)
-        self.n_decoder_layers = kwargs.get('n_decoder_layers', 2)
-        self.dropout = kwargs.get('dropout', 0.1)
+        self.n_encoder_layers = kwargs.get("n_encoder_layers", 2)
+        self.n_decoder_layers = kwargs.get("n_decoder_layers", 2)
+        self.dropout = kwargs.get("dropout", 0.1)
         self.activation_class = get_activation_class(kwargs.get("activation", "gelu"))
         self.kwargs = kwargs
 
@@ -86,7 +88,7 @@ class EmbedSumPerturbationModel(PerturbationModel):
             dropout=self.dropout,
             activation=self.activation_class,
         )
-        
+
         self.project_out = build_mlp(
             in_dim=self.hidden_dim,
             out_dim=self.output_dim,
@@ -99,11 +101,11 @@ class EmbedSumPerturbationModel(PerturbationModel):
     def encode_perturbation(self, pert: torch.Tensor) -> torch.Tensor:
         """Map perturbation to an effect vector in embedding space."""
         return self.pert_encoder(pert)
-    
+
     def encode_basal_expression(self, expr: torch.Tensor) -> torch.Tensor:
         """Expression is already in embedding space, pass through."""
         return self.basal_encoder(expr)
-    
+
     def perturb(self, pert: torch.Tensor, basal: torch.Tensor) -> torch.Tensor:
         """
         Given a perturbation and basal embeddings, compute the perturbed embedding.
@@ -111,25 +113,25 @@ class EmbedSumPerturbationModel(PerturbationModel):
         # Project perturbation and basal cell state to latent space
         perturbation = self.encode_perturbation(pert)
         basal_encoded = self.basal_encoder(basal)
-        
+
         # Add perturbation to basal embedding
         perturbed_encoded = basal_encoded + perturbation
-        return perturbed_encoded 
+        return perturbed_encoded
 
     def forward(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
         """
-        Given 
-        
+        Given
+
         Args:
             batch: Dictionary containing:
                 - pert: Perturbation one-hot
                 - basal: Control expression embedding
         """
-        pert = batch['pert']
-        basal = batch['basal']
-        
+        pert = batch["pert"]
+        basal = batch["basal"]
+
         # compute perturbed cell state to perturbation/cell co-embedding space
         perturbed_encoded = self.perturb(pert, basal)
-        
+
         # Decode to gene space or to input cell embedding space
         return self.project_out(perturbed_encoded)

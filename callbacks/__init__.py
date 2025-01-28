@@ -4,6 +4,7 @@ import torch
 import numpy as np
 from models import PerturbationModel
 
+
 class GradNormCallback(Callback):
     """
     Logs the gradient norm.
@@ -14,24 +15,26 @@ class GradNormCallback(Callback):
     ) -> None:
         pl_module.log("train/gradient_norm", gradient_norm(pl_module))
 
+
 def gradient_norm(model):
     total_norm = 0.0
     for p in model.parameters():
         if p.grad is not None:
             param_norm = p.grad.detach().data.norm(2)
             total_norm += param_norm.item() ** 2
-    total_norm = total_norm ** (1. / 2)
+    total_norm = total_norm ** (1.0 / 2)
     return total_norm
+
 
 class PerturbationMagnitudeCallback(Callback):
     """
     Callback that tracks the average magnitude of perturbation effects by measuring
     the L2 norm of the difference between predicted perturbed state and control/basal state.
     """
-    
+
     def __init__(self):
         super().__init__()
-                    
+
     def on_validation_batch_end(
         self,
         trainer: "pl.Trainer",

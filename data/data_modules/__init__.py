@@ -1,2 +1,1 @@
-from data.data_modules.multidataset_dataloader import \
-    MultiDatasetPerturbationDataModule
+from data.data_modules.multidataset_dataloader import MultiDatasetPerturbationDataModule

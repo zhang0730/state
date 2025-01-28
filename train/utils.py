@@ -2,8 +2,9 @@ import torch.nn as nn
 
 from geomloss import SamplesLoss
 
+
 def get_loss_fn(
-    name: str, 
+    name: str,
     **kwargs,
 ) -> nn.Module:
     """

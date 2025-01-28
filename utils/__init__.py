@@ -5,6 +5,7 @@ from numba import cuda
 
 from .uce_utils import UCEGenePredictor
 
+
 @contextmanager
 def time_it(timer_name: str):
     logging.debug(f"Starting timer {timer_name}")
@@ -18,9 +19,9 @@ def time_it(timer_name: str):
 
 
 def is_gpu_available():
-    '''
+    """
     Check if RAPIDS is available, if available return number of GPUs otherwise return 0
-    '''
+    """
     try:
         num_gpus = cuda.get_num_gpus()
         return num_gpus

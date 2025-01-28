@@ -6,7 +6,9 @@ from utils import UCEGenePredictor
 
 # set up logger
 import logging
+
 logger = logging.getLogger(__name__)
+
 
 class DecoderInterface(ABC):
     """
@@ -14,6 +16,7 @@ class DecoderInterface(ABC):
 
     Specific implementations may pass in their own kwargs.
     """
+
     @abstractmethod
     def compute_de_genes(self, adata_latent, **kwargs):
         """
@@ -21,10 +24,12 @@ class DecoderInterface(ABC):
         """
         pass
 
+
 class UCELogProbDecoder(DecoderInterface):
     """
     This class decodes UCE embeddings into log probabilities of expression in gene space.
     """
+
     def __init__(
         self,
         model_loc="/large_storage/ctc/ML/data/cell/misc/model_used_in_paper_33l_8ep_1024t_1280.torch",
@@ -33,15 +38,15 @@ class UCELogProbDecoder(DecoderInterface):
 
     def compute_de_genes(self, adata_latent, pert_col, control_pert, genes, k=50):
         """
-        Compute DE in gene space using UCE predictions, by decoding probability in each gene and 
+        Compute DE in gene space using UCE predictions, by decoding probability in each gene and
         manipulating the log probs as a statistical test.
         """
         logger.info(f"Computing DE genes using UCE log probs decoder.")
-        gene_predictor = UCEGenePredictor(device='cuda:0', model_loc=self.model_loc)
+        gene_predictor = UCEGenePredictor(device="cuda:0", model_loc=self.model_loc)
         gene_logprobs = gene_predictor.compute_gene_prob_group_batched(adata_latent.X, genes, batch_size=32)
         probs_df = pd.DataFrame(gene_logprobs)
-        probs_df['pert'] = adata_latent.obs[pert_col].values
-        mean_df = probs_df.groupby('pert').mean()
+        probs_df["pert"] = adata_latent.obs[pert_col].values
+        mean_df = probs_df.groupby("pert").mean()
 
         ctrl = mean_df.loc[control_pert].values
         pert_effects = np.abs(mean_df - ctrl)

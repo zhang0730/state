@@ -16,10 +16,12 @@ logger = logging.getLogger(__name__)
 
 class DatasetType:
     """An enum-like class"""
+
     REPLOGLE = "replogle"
     MCFALINE = "mcfaline"
     JIANG = "jiang"
     SCIPLEX = "sciplex"
+
 
 def get_dataset_type(name: str) -> DatasetType:
     """Maps dataset name from config to DatasetType enum"""
@@ -27,7 +29,7 @@ def get_dataset_type(name: str) -> DatasetType:
     if name == "replogle":
         return DatasetType.REPLOGLE
     elif name == "mcfaline":
-        return DatasetType.MCFALINE 
+        return DatasetType.MCFALINE
     elif name == "jiang":
         return DatasetType.JIANG
     elif name == "sciplex":
@@ -35,12 +37,13 @@ def get_dataset_type(name: str) -> DatasetType:
     else:
         raise ValueError(f"Unknown dataset type: {name}")
 
+
 class PerturbationDataset(Dataset):
     """
     Dataset class for loading perturbation data from h5 files.
 
     Each instance handles a single dataset-cell_type combination. Therefore this class is responsible for
-    serving a single dataset/cell_type pair. Future improvements will also allow for splitting on 
+    serving a single dataset/cell_type pair. Future improvements will also allow for splitting on
     the perturbation level.
 
     Currently there are three strategies for mapping basal cells to perturbed cells:
@@ -106,16 +109,16 @@ class PerturbationDataset(Dataset):
         self.split_train_val_controls = split_train_val_controls
 
         # Load file
-        self.h5_file = h5py.File(self.h5_path, 'r')
-        self.pert_categories = self.h5_file[f'obs/{self.pert_col}/categories'][:].astype(str)
-        self.cell_type_categories = self.h5_file[f'obs/{self.cell_type_key}/categories'][:].astype(str)
+        self.h5_file = h5py.File(self.h5_path, "r")
+        self.pert_categories = self.h5_file[f"obs/{self.pert_col}/categories"][:].astype(str)
+        self.cell_type_categories = self.h5_file[f"obs/{self.cell_type_key}/categories"][:].astype(str)
 
-        try: # replogle treats batch as an int
+        try:  # replogle treats batch as an int
             self.batch_is_categorical = False
-            self.batch_categories = self.h5_file[f'obs/{self.batch_col}'][:].astype(int)
-        except TypeError: # but some other datasets have it as a string (categorical)
+            self.batch_categories = self.h5_file[f"obs/{self.batch_col}"][:].astype(int)
+        except TypeError:  # but some other datasets have it as a string (categorical)
             self.batch_is_categorical = True
-            self.batch_categories = self.h5_file[f'obs/{self.batch_col}/categories'][:].astype(str)
+            self.batch_categories = self.h5_file[f"obs/{self.batch_col}/categories"][:].astype(str)
 
         # Some cached info
         self.n_genes = self._get_num_genes()
@@ -124,23 +127,28 @@ class PerturbationDataset(Dataset):
 
         # Identify which cells are controls vs. perturbed
         self.control_mask = (
-            self.h5_file[f'obs/{self.pert_col}/codes'][:] ==
-            np.where(self.pert_categories == self.control_pert)[0]
+            self.h5_file[f"obs/{self.pert_col}/codes"][:] == np.where(self.pert_categories == self.control_pert)[0]
         )
 
         # TODO-Abhi: we should move this logic to MultiDatasetPerturbationDataModule
         if self.pert_tracker is not None:
             cell_type = str(self.cell_type_categories[0])  # single type per file
             dataset_name = name
-            self.valid_perts = self.pert_tracker.track_celltype_perturbations(
-                self.h5_file,
-                dataset_name,
-                cell_type
-            )
+            self.valid_perts = self.pert_tracker.track_celltype_perturbations(self.h5_file, dataset_name, cell_type)
 
-        # We'll store the indices for each split. 
-        self.split_perturbed_indices = {'train': set(), 'train_eval': set(), 'val': set(), 'test': set()}
-        self.split_control_indices = {'train': set(), 'train_eval': set(), 'val': set(), 'test': set()}
+        # We'll store the indices for each split.
+        self.split_perturbed_indices = {
+            "train": set(),
+            "train_eval": set(),
+            "val": set(),
+            "test": set(),
+        }
+        self.split_control_indices = {
+            "train": set(),
+            "train_eval": set(),
+            "val": set(),
+            "test": set(),
+        }
 
         self.preloaded_data = {}
         if preload_data:
@@ -160,7 +168,7 @@ class PerturbationDataset(Dataset):
     def __len__(self) -> int:
         return self.n_cells
 
-    def reset_mapping_strategy(self, new_strategy: BaseMappingStrategy, stage='train', **strategy_kwargs):
+    def reset_mapping_strategy(self, new_strategy: BaseMappingStrategy, stage="train", **strategy_kwargs):
         """
         Re-run register_split_indices(...) for each known split in this dataset,
         using the new mapping strategy. This preserves the exact same indices
@@ -173,10 +181,8 @@ class PerturbationDataset(Dataset):
             pert_array = np.array(list(self.split_perturbed_indices[split_name]))
             ctrl_array = np.array(list(self.split_control_indices[split_name]))
             # call the new strategy’s register
-            self.mapping_strategy.register_split_indices(
-                self, split_name, pert_array, ctrl_array
-            )
-    
+            self.mapping_strategy.register_split_indices(self, split_name, pert_array, ctrl_array)
+
     def __getitem__(self, idx: int):
         """
         Get a control matching data from the dataset, given its index.
@@ -192,34 +198,34 @@ class PerturbationDataset(Dataset):
         """
         # Determine which split this cell belongs to (only needed if we do subset direct).
         split = self._find_split_for_idx(idx)
-        
+
         if not self.should_yield_control_cells and self.control_mask[idx]:
             raise ValueError(f"Index {idx} is a control cell in {self.name}")
 
-        # Get expressions (pseudobulked if using that strategy)  
+        # Get expressions (pseudobulked if using that strategy)
         pert_expr, ctrl_expr = self.mapping_strategy.get_mapped_expressions(self, split, idx)
-        
+
         # Rest of metadata...
         pert_code = self.h5_file[f"obs/{self.pert_col}/codes"][idx]
         pert_name = self.pert_categories[pert_code]
         pert_onehot = self.pert_onehot_map[pert_name]
-        
+
         ct_code = self.h5_file[f"obs/{self.cell_type_key}/codes"][idx]
         cell_type = self.cell_type_categories[ct_code]
         batch = self.get_batch(idx)
-        
+
         sample = {
             "X": pert_expr,
-            "basal": ctrl_expr, 
+            "basal": ctrl_expr,
             "pert": pert_onehot,
             "pert_name": pert_name,
             "cell_type": cell_type,
             "gem_group": batch,
         }
-        
+
         if self.store_raw_expression:
             sample["X_gene"] = self.fetch_gene_expression(idx)
-            
+
         return sample
 
     def get_batch(self, idx: int) -> torch.Tensor:
@@ -241,7 +247,7 @@ class PerturbationDataset(Dataset):
         """
         Get the feature dimensionality of obsm data with the specified key (e.g., 'X_uce').
         """
-        return self.h5_file[f'obsm/{key}'].shape[1]
+        return self.h5_file[f"obsm/{key}"].shape[1]
 
     # TODO-Abhi: can we move perturbed idx logic and control idx logic internally so these don't have to be passed in?
     def to_subset_dataset(
@@ -289,63 +295,63 @@ class PerturbationDataset(Dataset):
         rng: np.random.Generator = None,
     ) -> Dict[str, Dict[str, np.ndarray]]:
         """
-        Split dataset into train/val splits based on perturbation categories while 
+        Split dataset into train/val splits based on perturbation categories while
         maintaining approximate size ratios. Control cells are shared between splits.
-        
+
         Args:
             val_split: Fraction of data to use for validation
             rng: Random number generator for reproducibility
-            
+
         Returns:
             Dict of splits containing perturbed and control indices
         """
         if rng is None:
             rng = np.random.default_rng(42)
-            
+
         # Get all perturbations (excluding control)
-        pert_codes = self.h5_file[f'obs/{self.pert_col}/codes'][:]
+        pert_codes = self.h5_file[f"obs/{self.pert_col}/codes"][:]
         pert_names = self.pert_categories[pert_codes]
-        
+
         # Group cell indices by perturbation
         pert_groups = {}
         for pert in np.unique(pert_names):
             if pert == self.control_pert:
                 continue
             pert_groups[pert] = np.where(pert_names == pert)[0]
-        
+
         # Split while maintaining size proportions
         train_perts, val_perts = split_perturbations_by_cell_fraction(
             pert_groups,
             val_fraction=val_split,
             rng=rng,
         )
-        
+
         # Gather indices for each split
         train_indices = np.concatenate([pert_groups[p] for p in train_perts])
         val_indices = np.concatenate([pert_groups[p] for p in val_perts])
-        
+
         # 3) Control cells: either shared or split
         ctrl_indices = np.where(self.control_mask)[0]
         if not self.split_train_val_controls:
             # If we are NOT splitting controls, train+val both see the same controls
             train_ctrl = ctrl_indices
-            val_ctrl   = ctrl_indices
+            val_ctrl = ctrl_indices
         else:
             # If we DO split controls, we can do a straightforward proportion:
             rng.shuffle(ctrl_indices)
             n_val_ctrl = int(len(ctrl_indices) * val_split)
-            val_ctrl   = ctrl_indices[:n_val_ctrl]
+            val_ctrl = ctrl_indices[:n_val_ctrl]
             train_ctrl = ctrl_indices[n_val_ctrl:]
-        
+
         return {
-            'train': {
-                'perturbed': train_indices,
-                'control': train_ctrl,
+            "train": {
+                "perturbed": train_indices,
+                "control": train_ctrl,
             },
-            'val': {
-                'perturbed': val_indices,
-                'control': val_ctrl,
-            }
+            "val": {
+                "perturbed": val_indices,
+                "control": val_ctrl,
+            },
         }
 
     def prepare_fewshot_splits(
@@ -356,99 +362,82 @@ class PerturbationDataset(Dataset):
     ) -> Dict[str, Dict[str, np.ndarray]]:
         """
         Create train/val/test splits for few-shot learning, splitting on perturbations.
-        
+
         Args:
             few_shot_percent: Fraction of data to use for train+val
             val_split: Fraction of train+val to use for validation
             rng: Random number generator for reproducibility
-            
+
         Returns:
             Dict of splits containing perturbed and control indices
         """
         if rng is None:
             rng = np.random.default_rng(42)
-            
+
         # Get all perturbations (excluding control)
-        pert_codes = self.h5_file[f'obs/{self.pert_col}/codes'][:]
+        pert_codes = self.h5_file[f"obs/{self.pert_col}/codes"][:]
         pert_names = self.pert_categories[pert_codes]
-        
+
         # Group indices by perturbation
         pert_groups = {}
         for pert in np.unique(pert_names):
             if pert == self.control_pert:
                 continue
             pert_groups[pert] = np.where(pert_names == pert)[0]
-        
+
         train_val_perts, test_perts = split_perturbations_by_cell_fraction(
             pert_groups,
-            1-few_shot_percent,
+            1 - few_shot_percent,
             rng=rng,
         )
-        
+
         # Then split train+val into train vs val
-        train_val_pert_groups = {
-            pert: pert_groups[pert] for pert in train_val_perts
-        }
+        train_val_pert_groups = {pert: pert_groups[pert] for pert in train_val_perts}
         train_perts, val_perts = split_perturbations_by_cell_fraction(
             train_val_pert_groups,
             val_split,
             rng=rng,
         )
-        
+
         # Gather indices for each split
         train_indices = np.concatenate([pert_groups[p] for p in train_perts])
-        val_indices = np.concatenate([pert_groups[p] for p in val_perts])  
+        val_indices = np.concatenate([pert_groups[p] for p in val_perts])
         test_indices = np.concatenate([pert_groups[p] for p in test_perts])
-        
+
         # 4) Handle control cells. By default, test has separate controls.
         ctrl_indices = np.where(self.control_mask)[0]
         n_test_ctrl = int(len(ctrl_indices) * (1 - few_shot_percent))
-        train_val_ctrl = ctrl_indices[:-n_test_ctrl]   # for train+val
-        test_ctrl      = ctrl_indices[-n_test_ctrl:]   # separate for test
-        
+        train_val_ctrl = ctrl_indices[:-n_test_ctrl]  # for train+val
+        test_ctrl = ctrl_indices[-n_test_ctrl:]  # separate for test
+
         if not self.split_train_val_controls:
             # If not splitting controls, then train+val share the same control cells
             train_ctrl = train_val_ctrl
-            val_ctrl   = train_val_ctrl
+            val_ctrl = train_val_ctrl
         else:
             # If we DO want to split train vs val controls as well
             rng.shuffle(train_val_ctrl)
             n_val_ctrl = int(len(train_val_ctrl) * val_split)
-            val_ctrl   = train_val_ctrl[:n_val_ctrl]
+            val_ctrl = train_val_ctrl[:n_val_ctrl]
             train_ctrl = train_val_ctrl[n_val_ctrl:]
 
         return {
-            'train': {
-                'perturbed': train_indices,
-                'control': train_ctrl
-            },
-            'val': {
-                'perturbed': val_indices,
-                'control': val_ctrl
-            },
-            'test': {
-                'perturbed': test_indices,
-                'control': test_ctrl
-            }
+            "train": {"perturbed": train_indices, "control": train_ctrl},
+            "val": {"perturbed": val_indices, "control": val_ctrl},
+            "test": {"perturbed": test_indices, "control": test_ctrl},
         }
-    
-    def fetch_gene_expression(self, idx: int) -> torch.Tensor:
-        if hasattr(self, "preloaded_data") and 'X' in self.preloaded_data:
-            return torch.tensor(self.preloaded_data['X'][idx], dtype=torch.float32)
 
-        attrs = dict(self.h5_file['X'].attrs)
-        if attrs['encoding-type'] == 'csr_matrix':
+    def fetch_gene_expression(self, idx: int) -> torch.Tensor:
+        if hasattr(self, "preloaded_data") and "X" in self.preloaded_data:
+            return torch.tensor(self.preloaded_data["X"][idx], dtype=torch.float32)
+
+        attrs = dict(self.h5_file["X"].attrs)
+        if attrs["encoding-type"] == "csr_matrix":
             indptr = self.h5_file["/X/indptr"]
             start_ptr = indptr[idx]
             end_ptr = indptr[idx + 1]
-            sub_data = torch.tensor(
-                self.h5_file["/X/data"][start_ptr:end_ptr],
-                dtype=torch.float32
-            )
-            sub_indices = torch.tensor(
-                self.h5_file["/X/indices"][start_ptr:end_ptr],
-                dtype=torch.long
-            )
+            sub_data = torch.tensor(self.h5_file["/X/data"][start_ptr:end_ptr], dtype=torch.float32)
+            sub_indices = torch.tensor(self.h5_file["/X/indices"][start_ptr:end_ptr], dtype=torch.long)
             counts = torch.sparse_csr_tensor(
                 torch.tensor([0], dtype=torch.long),
                 sub_indices,
@@ -460,7 +449,7 @@ class PerturbationDataset(Dataset):
             row_data = self.h5_file["/X"][idx]
             data = torch.tensor(row_data)
         return data
-    
+
     def fetch_obsm_expression(self, idx: int, key: str) -> torch.Tensor:
         if hasattr(self, "preloaded_data") and key in self.preloaded_data:
             return torch.tensor(self.preloaded_data[key][idx], dtype=torch.float32)
@@ -491,7 +480,7 @@ class PerturbationDataset(Dataset):
         """
         Custom collate function that can apply transforms on batched data.
 
-        The transform is bound to the dataset instance via a partial, hence why this 
+        The transform is bound to the dataset instance via a partial, hence why this
         is a static method.
         """
         # First do normal collation
@@ -500,37 +489,29 @@ class PerturbationDataset(Dataset):
             "basal": torch.stack([item["basal"] for item in batch]),
             "pert": torch.stack([item["pert"] for item in batch]),
             "pert_name": [item["pert_name"] for item in batch],
-            "cell_type": [item["cell_type"] for item in batch], 
+            "cell_type": [item["cell_type"] for item in batch],
             "gem_group": torch.tensor([item["gem_group"] for item in batch]),
         }
 
         # If the first sample has "X_gene", assume the entire batch does
         if "X_gene" in batch[0]:
-            batch_dict["X_gene"] = torch.stack(
-                [item["X_gene"] for item in batch]
-            )
+            batch_dict["X_gene"] = torch.stack([item["X_gene"] for item in batch])
 
         # Apply transform if provided
         if transform is not None:
-            batch_dict["X"] = transform.encode(batch_dict["X"]) 
+            batch_dict["X"] = transform.encode(batch_dict["X"])
             batch_dict["basal"] = transform.encode(batch_dict["basal"])
 
         return batch_dict
 
-
     ##############################
     # Utility methods
     ##############################
-    def _register_split_indices(
-        self,
-        split: str,
-        perturbed_indices: np.ndarray,
-        control_indices: np.ndarray
-    ):
+    def _register_split_indices(self, split: str, perturbed_indices: np.ndarray, control_indices: np.ndarray):
         """
         Register which cell indices belong to the perturbed vs. control set for
-        a given split. 
-        
+        a given split.
+
         These are passed to the mapping strategy to let it build its internal structures as needed.
         """
         if split not in self.split_perturbed_indices:
@@ -569,10 +550,10 @@ class PerturbationDataset(Dataset):
         try:
             n_rows = self.h5_file["X"].shape[0]
         except:
-            indptr = self.h5_file["X/indptr"][:]    # shape: (n_rows+1,)
+            indptr = self.h5_file["X/indptr"][:]  # shape: (n_rows+1,)
             n_rows = len(indptr) - 1
         return n_rows
-    
+
     def __getstate__(self):
         """
         Return a dictionary of this dataset's state without the open h5 file object.
@@ -597,16 +578,14 @@ class PerturbationDataset(Dataset):
     def _preload_all_data(self):
         """Preload all data into memory."""
         logger.info(f"[{self.name}] Preloading all data into memory...")
-        
+
         # Load gene expression
-        self.preloaded_data['X'] = torch.stack([
-            self.fetch_gene_expression(i) for i in range(self.n_cells)
-        ])
-            
+        self.preloaded_data["X"] = torch.stack([self.fetch_gene_expression(i) for i in range(self.n_cells)])
+
         # Load embeddings if used
         if self.embed_key:
-            self.preloaded_data[self.embed_key] = torch.stack([
-                self.fetch_obsm_expression(i, self.embed_key) for i in range(self.n_cells)
-            ])
-            
+            self.preloaded_data[self.embed_key] = torch.stack(
+                [self.fetch_obsm_expression(i, self.embed_key) for i in range(self.n_cells)]
+            )
+
         logger.info(f"[{self.name}] Preload complete.")

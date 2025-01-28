@@ -12,7 +12,7 @@ from lightning.pytorch.loggers import CSVLogger, WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint, Callback
 
 from data.utils.modules import get_datamodule
-from data.data_modules.tasks import parse_dataset_specs # TODO-Abhi: Should this move?
+from data.data_modules.tasks import parse_dataset_specs  # TODO-Abhi: Should this move?
 from models.decoders import UCELogProbDecoder
 from models import (
     SimpleSumPerturbationModel,
@@ -23,73 +23,76 @@ from models import (
 from callbacks import GradNormCallback, PerturbationMagnitudeCallback
 
 import logging
+
 logger = logging.getLogger(__name__)
+
 
 def get_lightning_module(model_type: str, data_config: dict, model_config: dict, training_config: dict, var_dims: dict):
     """Create model instance based on config."""
     # combine the model config and training config
     module_config = {**model_config, **training_config}
-    module_config['embed_key'] = data_config['embed_key']
-    module_config['output_space'] = data_config['output_space']
-    module_config['gene_names'] = var_dims['gene_names']
+    module_config["embed_key"] = data_config["embed_key"]
+    module_config["output_space"] = data_config["output_space"]
+    module_config["gene_names"] = var_dims["gene_names"]
 
     if data_config["output_space"] == "gene":
         # the model outputs will be in gene space, so no decoder is needed
-        module_config['decoder'] = None
+        module_config["decoder"] = None
     else:
         # the model outputs will be in latent space, so a decoder is needed
-        if module_config['embed_key'] == 'X_uce':
+        if module_config["embed_key"] == "X_uce":
             # UCE log prob decoder requires gene names
-            module_config['decoder'] = UCELogProbDecoder() # TODO-Abhi: try out new decoders here
+            module_config["decoder"] = UCELogProbDecoder()  # TODO-Abhi: try out new decoders here
         else:
             # Add more decoders here as needed
-            module_config['decoder'] = None
+            module_config["decoder"] = None
 
-    if model_type.lower() == 'embedsum':
+    if model_type.lower() == "embedsum":
         return EmbedSumPerturbationModel(
-            input_dim=var_dims['input_dim'],
-            output_dim=var_dims['output_dim'],
-            pert_dim=var_dims['pert_dim'],
+            input_dim=var_dims["input_dim"],
+            output_dim=var_dims["output_dim"],
+            pert_dim=var_dims["pert_dim"],
             **module_config,
         )
-    elif model_type.lower() == 'neuralot':
+    elif model_type.lower() == "neuralot":
         return NeuralOTPerturbationModel(
-            input_dim=var_dims['input_dim'],
-            output_dim=var_dims['output_dim'],
-            pert_dim=var_dims['pert_dim'],
+            input_dim=var_dims["input_dim"],
+            output_dim=var_dims["output_dim"],
+            pert_dim=var_dims["pert_dim"],
             **module_config,
         )
-    elif model_type.lower() == 'simplesum':
+    elif model_type.lower() == "simplesum":
         return SimpleSumPerturbationModel(
-            input_dim=var_dims['input_dim'],
-            output_dim=var_dims['output_dim'],
-            pert_dim=var_dims['pert_dim'],
+            input_dim=var_dims["input_dim"],
+            output_dim=var_dims["output_dim"],
+            pert_dim=var_dims["pert_dim"],
             **module_config,
         )
-    elif model_type.lower() == 'globalsimplesum':
+    elif model_type.lower() == "globalsimplesum":
         return GlobalSimpleSumPerturbationModel(
-            input_dim=var_dims['input_dim'],
-            output_dim=var_dims['output_dim'],
-            pert_dim=var_dims['pert_dim'],
+            input_dim=var_dims["input_dim"],
+            output_dim=var_dims["output_dim"],
+            pert_dim=var_dims["pert_dim"],
             **module_config,
         )
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 
+
 def get_loggers(
     output_dir: str,
-    name: str, 
+    name: str,
     wandb_project: str,
     wandb_entity: str,
     local_wandb_dir: str,
     use_wandb: bool = False,
-    cfg: dict = None
+    cfg: dict = None,
 ) -> List:
     """Set up logging to local CSV and optionally WandB."""
     # Always use CSV logger
     csv_logger = CSVLogger(save_dir=output_dir, name=name, version=0)
     loggers = [csv_logger]
-    
+
     # Add WandB if requested
     if use_wandb:
         wandb_logger = WandbLogger(
@@ -102,14 +105,11 @@ def get_loggers(
         if cfg is not None:
             wandb_logger.experiment.config.update(cfg)
         loggers.append(wandb_logger)
-        
+
     return loggers
 
-def get_checkpoint_callbacks(
-    output_dir: str,
-    name: str,
-    val_freq: int
-) -> List[ModelCheckpoint]:
+
+def get_checkpoint_callbacks(output_dir: str, name: str, val_freq: int) -> List[ModelCheckpoint]:
     """Create checkpoint callbacks based on validation frequency."""
     checkpoint_dir = join(output_dir, name, "checkpoints")
     callbacks = []
@@ -135,8 +135,9 @@ def get_checkpoint_callbacks(
         save_top_k=-1,  # Keep all periodic checkpoints
     )
     callbacks.append(periodic_ckpt)
-    
+
     return callbacks
+
 
 @hydra.main(version_base=None, config_path="../configs", config_name="config")
 def train(cfg: DictConfig) -> None:
@@ -152,7 +153,7 @@ def train(cfg: DictConfig) -> None:
         print(f"Output dir {run_output_dir} already exists, overwriting")
         shutil.rmtree(run_output_dir)
     os.makedirs(run_output_dir, exist_ok=True)
-    
+
     # Set up wandb directory if needed
     if cfg["use_wandb"]:
         os.makedirs(cfg["wandb"]["local_wandb_dir"], exist_ok=True)
@@ -169,37 +170,25 @@ def train(cfg: DictConfig) -> None:
     # that involve mapping strageties (e.g., connecting perturbed cells to control cells.)
     if cfg["data"]["name"] == "MultiDatasetPerturbationDataModule":
         # Parse train specs
-        if isinstance(cfg['data']['kwargs']['train_task'], list):
-            cfg["data"]["kwargs"]["train_specs"] = parse_dataset_specs(
-                cfg['data']['kwargs']['train_task']
-            )
+        if isinstance(cfg["data"]["kwargs"]["train_task"], list):
+            cfg["data"]["kwargs"]["train_specs"] = parse_dataset_specs(cfg["data"]["kwargs"]["train_task"])
         else:
-            cfg["data"]["kwargs"]["train_specs"] = parse_dataset_specs(
-                [cfg['data']['kwargs']['train_task']]
-            )
+            cfg["data"]["kwargs"]["train_specs"] = parse_dataset_specs([cfg["data"]["kwargs"]["train_task"]])
 
         # Parse test specs
-        if isinstance(cfg['data']['kwargs']['test_task'], list):
-            cfg["data"]["kwargs"]["test_specs"] = parse_dataset_specs(
-                cfg['data']['kwargs']['test_task']
-            )
+        if isinstance(cfg["data"]["kwargs"]["test_task"], list):
+            cfg["data"]["kwargs"]["test_specs"] = parse_dataset_specs(cfg["data"]["kwargs"]["test_task"])
         else:
-            cfg["data"]["kwargs"]["test_specs"] = parse_dataset_specs(
-                [cfg['data']['kwargs']['test_task']]
-            )
+            cfg["data"]["kwargs"]["test_specs"] = parse_dataset_specs([cfg["data"]["kwargs"]["test_task"]])
 
     # Initialize data module
-    data_module = get_datamodule(
-        cfg["data"]["name"],
-        cfg["data"]["kwargs"],
-        batch_size=cfg["training"]["batch_size"]
-    )
+    data_module = get_datamodule(cfg["data"]["name"], cfg["data"]["kwargs"], batch_size=cfg["training"]["batch_size"])
 
     # Special handling for multi-dataset case - TODO-now: revisit this.
     if cfg["data"]["name"] == "MultiDatasetPerturbationDataModule":
-        data_module.setup(stage='fit')
-        data_module.setup(stage='test')
-        
+        data_module.setup(stage="fit")
+        data_module.setup(stage="test")
+
         # Save data module for reproducibility
         with open(join(run_output_dir, "data_module.pkl"), "wb") as f:
             # TODO-Abhi: only save necessary data
@@ -211,7 +200,7 @@ def train(cfg: DictConfig) -> None:
         cfg["data"]["kwargs"],
         cfg["model"]["kwargs"],
         cfg["training"],
-        data_module.get_var_dims()
+        data_module.get_var_dims(),
     )
 
     # Set up logging
@@ -222,7 +211,7 @@ def train(cfg: DictConfig) -> None:
         wandb_entity=cfg["wandb"]["entity"],
         local_wandb_dir=cfg["wandb"]["local_wandb_dir"],
         use_wandb=cfg["use_wandb"],
-        cfg=cfg
+        cfg=cfg,
     )
 
     # If using wandb, store the run path in a text file for eval
@@ -235,21 +224,14 @@ def train(cfg: DictConfig) -> None:
             break
 
     # Set up callbacks
-    ckpt_callbacks = get_checkpoint_callbacks(
-        cfg["output_dir"],
-        cfg["name"],
-        cfg["training"]["val_freq"]
-    )
-    callbacks = ckpt_callbacks + [
-        GradNormCallback(),
-        PerturbationMagnitudeCallback()
-    ]
+    ckpt_callbacks = get_checkpoint_callbacks(cfg["output_dir"], cfg["name"], cfg["training"]["val_freq"])
+    callbacks = ckpt_callbacks + [GradNormCallback(), PerturbationMagnitudeCallback()]
 
     # Decide on trainer params
     trainer_kwargs = dict(
         accelerator="gpu",
         devices=1,
-        max_steps=cfg["training"]["max_steps"],        # for normal models
+        max_steps=cfg["training"]["max_steps"],  # for normal models
         check_val_every_n_epoch=None,
         val_check_interval=cfg["training"]["val_freq"],
         logger=loggers,
@@ -258,9 +240,10 @@ def train(cfg: DictConfig) -> None:
     )
 
     # If it's SimpleSum, override to do exactly 1 epoch, ignoring `max_steps`.
-    if (cfg["model"]["name"].lower() == "simplesum" or cfg["model"]["name"].lower() == "globalsimplesum") \
-        and cfg["data"]["kwargs"]["output_space"] == "latent":
-        trainer_kwargs["max_epochs"] = 1     # do exactly one epoch
+    if (cfg["model"]["name"].lower() == "simplesum" or cfg["model"]["name"].lower() == "globalsimplesum") and cfg[
+        "data"
+    ]["kwargs"]["output_space"] == "latent":
+        trainer_kwargs["max_epochs"] = 1  # do exactly one epoch
         # delete max_steps to avoid conflicts
         del trainer_kwargs["max_steps"]
 
@@ -289,6 +272,7 @@ def train(cfg: DictConfig) -> None:
         datamodule=data_module,
         ckpt_path=checkpoint_path,
     )
-    
+
+
 if __name__ == "__main__":
     train()
